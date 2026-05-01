@@ -24,12 +24,32 @@ import {
 import { useRouter } from 'next/navigation'
 import Toast from '@/components/Toast'
 
+interface NotificationPreferences {
+  new_message: boolean
+  invite_accepted: boolean
+  submission_approved: boolean
+  new_status_post_created: boolean
+}
+
+interface Profile {
+  id: string
+  notification_preferences?: NotificationPreferences
+  // Add other profile fields as needed
+}
+
+interface ToggleItemProps {
+  label: string
+  desc: string
+  enabled: boolean
+  onToggle: (val: boolean) => void
+}
+
 export default function SettingsPage() {
-  const [profile, setProfile] = useState<any>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
   
-  const [notifications, setNotificationPrefs] = useState({
+  const [notifications, setNotificationPrefs] = useState<NotificationPreferences>({
     new_message: true,
     invite_accepted: true,
     submission_approved: true,
@@ -71,7 +91,7 @@ export default function SettingsPage() {
     }
   }
 
-  const handleToggleNotification = async (key: string, value: boolean) => {
+  const handleToggleNotification = async (key: keyof NotificationPreferences, value: boolean) => {
     const updated = { ...notifications, [key]: value }
     setNotificationPrefs(updated)
     
@@ -79,7 +99,7 @@ export default function SettingsPage() {
       const { error } = await supabase
         .from('profiles')
         .update({ notification_preferences: updated })
-        .eq('id', profile.id)
+        .eq('id', profile!.id)
       
       if (error) throw error
       setToastMessage('Preferences saved!')
@@ -226,7 +246,7 @@ export default function SettingsPage() {
   )
 }
 
-function ToggleItem({ label, desc, enabled, onToggle }: any) {
+function ToggleItem({ label, desc, enabled, onToggle }: ToggleItemProps) {
   return (
     <div className="flex items-center justify-between p-4 rounded-2xl border border-transparent">
        <div className="max-w-md">
