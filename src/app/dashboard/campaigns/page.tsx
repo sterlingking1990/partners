@@ -28,6 +28,7 @@ export default function CampaignCenterPage() {
   const [filter, setFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [user, setUser] = useState<any>(null)
+  const [rewardedMediaIds, setRewardedMediaIds] = useState<Set<string>>(new Set())
   
   // Status Viewer State
   const [showStatusViewer, setShowStatusViewer] = useState(false)
@@ -108,10 +109,30 @@ export default function CampaignCenterPage() {
       )
 
       setCampaigns(enriched)
+      await fetchRewardedMedia()
     } catch (err) {
       console.error(err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchRewardedMedia = async () => {
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      if (!authUser) return
+
+      const { data, error } = await supabase
+        .from('status_views')
+        .select('media_id')
+        .eq('viewer_id', authUser.id)
+        .eq('reward_given', true)
+        .not('media_id', 'is', null)
+
+      if (error) throw error
+      setRewardedMediaIds(new Set((data || []).map((view: any) => view.media_id)))
+    } catch (err) {
+      console.error('Error fetching rewarded media:', err)
     }
   }
 
@@ -122,13 +143,28 @@ export default function CampaignCenterPage() {
     return matchesTab && matchesSearch
   })
 
-  const handleOpenStatus = (campaign: any) => {
+  const isStatusCompleted = (campaign: any) => {
+    if (campaign.type !== 'status_view') return false
+    return campaign.media_items?.every((media: any) => rewardedMediaIds.has(media.id))
+  }
+
+  const handleOpenStatus = async (campaign: any) => {
     if (!campaign.media_items || campaign.media_items.length === 0) {
       alert('This story has no media content.')
       return
     }
+
+    if (user) {
+      try {
+        await supabase.rpc('record_view', {
+          p_status_id: campaign.id,
+          p_viewer_id: user.id
+        })
+      } catch (err) {
+        console.error('Failed to record status view:', err)
+      }
+    }
     
-    // Find index in FILTERED list to allow navigation
     const indexInFiltered = filteredCampaigns.findIndex(c => c.id === campaign.id)
     setCurrentStatusIndex(indexInFiltered)
     setShowStatusViewer(true)
@@ -196,10 +232,15 @@ export default function CampaignCenterPage() {
         ) : filteredCampaigns.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
              {filteredCampaigns.map((camp) => (
-               <CampaignCard key={camp.id} campaign={camp} onClick={() => {
-                 if (camp.type === 'status_view') handleOpenStatus(camp)
-                 else router.push(`/dashboard/campaigns/${camp.id}`)
-               }} />
+               <CampaignCard
+                 key={camp.id}
+                 campaign={camp}
+                 completed={isStatusCompleted(camp)}
+                 onClick={() => {
+                   if (camp.type === 'status_view') handleOpenStatus(camp)
+                   else router.push(`/dashboard/campaigns/${camp.id}`)
+                 }}
+               />
              ))}
           </div>
         ) : (
@@ -225,13 +266,14 @@ export default function CampaignCenterPage() {
             fetchData() // Refresh to show updated rewards
           }}
           user={user}
+          onRewardedUpdate={fetchRewardedMedia}
         />
       )}
     </div>
   )
 }
 
-function StatusViewerModal({ statuses, initialIndex, onClose, user }: any) {
+function StatusViewerModal({ statuses, initialIndex, onClose, user, onRewardedUpdate }: any) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0)
   const [progress, setProgress] = useState(0)
@@ -241,6 +283,7 @@ function StatusViewerModal({ statuses, initialIndex, onClose, user }: any) {
   const supabase = createClient()
   const router = useRouter()
   const timerRef = useRef<any>(null)
+  const viewedMediaIds = useRef(new Set()); // Added
 
   const currentStatus = statuses[currentIndex]
   const currentMedia = currentStatus?.media_items?.[currentMediaIndex]
@@ -248,9 +291,10 @@ function StatusViewerModal({ statuses, initialIndex, onClose, user }: any) {
   useEffect(() => {
     if (currentMedia) {
       startTimer()
+      // handleReward will be called after viewing duration completes
     }
     return () => stopTimer()
-  }, [currentIndex, currentMediaIndex])
+  }, [currentIndex, currentMediaIndex, currentMedia])
 
   const startTimer = () => {
     stopTimer()
@@ -268,7 +312,7 @@ function StatusViewerModal({ statuses, initialIndex, onClose, user }: any) {
 
       if (elapsed >= duration) {
         stopTimer()
-        handleReward()
+        handleReward() // Call reward after full viewing duration
         nextMedia()
       }
     }, interval)
@@ -306,6 +350,13 @@ function StatusViewerModal({ statuses, initialIndex, onClose, user }: any) {
 
   const handleReward = async () => {
     if (!currentMedia || !user) return
+
+    // Prevent duplicate rewards for the same media item in this session
+    if (viewedMediaIds.current.has(currentMedia.id)) {
+      return;
+    }
+    viewedMediaIds.current.add(currentMedia.id);
+
     try {
       const { data } = await supabase.rpc('record_media_view_with_reward', {
         p_media_id: currentMedia.id,
@@ -313,6 +364,11 @@ function StatusViewerModal({ statuses, initialIndex, onClose, user }: any) {
       })
       if (data?.success && data?.reward_given) {
         setIsRewarded(true)
+        if (onRewardedUpdate) {
+          onRewardedUpdate()
+        }
+        // Hide reward popup after 3 seconds
+        setTimeout(() => setIsRewarded(false), 3000)
       }
     } catch (err) {
       console.error('Reward error:', err)
@@ -446,7 +502,7 @@ function StatusViewerModal({ statuses, initialIndex, onClose, user }: any) {
   )
 }
 
-function CampaignCard({ campaign, onClick }: { campaign: any, onClick: () => void }) {
+function CampaignCard({ campaign, completed, onClick }: { campaign: any, completed?: boolean, onClick: () => void }) {
   const getTypeColor = (type: string) => {
     switch(type) {
       case 'status_view': return 'bg-emerald-50 text-emerald-600'
@@ -508,7 +564,7 @@ function CampaignCard({ campaign, onClick }: { campaign: any, onClick: () => voi
             onClick={onClick}
             className="flex items-center gap-2 bg-gray-900 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-brand transition-all shadow-lg active:scale-95"
           >
-             {campaign.type === 'status_view' ? 'WATCH' : 'DETAILS'}
+             {campaign.type === 'status_view' ? (completed ? 'VIEW AGAIN' : 'WATCH') : 'DETAILS'}
              <ChevronRight size={14} />
           </button>
        </div>
@@ -517,6 +573,12 @@ function CampaignCard({ campaign, onClick }: { campaign: any, onClick: () => voi
          <div className="absolute top-4 right-8 flex items-center gap-1 px-2 py-0.5 bg-brand/5 border border-brand/10 rounded text-[9px] font-black text-brand uppercase tracking-tighter">
             <Users size={10} />
             {campaign.source_hub_name}
+         </div>
+       )}
+       {completed && (
+         <div className="absolute top-4 left-8 flex items-center gap-1 px-2 py-0.5 bg-emerald-100 border border-emerald-200 rounded text-[9px] font-black text-emerald-700 uppercase tracking-tighter">
+            <CheckCircle2 size={10} />
+            Completed
          </div>
        )}
     </div>
