@@ -122,6 +122,7 @@ export default function CampaignCenterPage() {
       const { data: { user: authUser } } = await supabase.auth.getUser()
       if (!authUser) return
 
+      console.log('fetchRewardedMedia for user', authUser.id)
       const { data, error } = await supabase
         .from('status_views')
         .select('media_id')
@@ -130,6 +131,7 @@ export default function CampaignCenterPage() {
         .not('media_id', 'is', null)
 
       if (error) throw error
+      console.log('Fetched rewarded media rows', data?.length ?? 0, data)
       setRewardedMediaIds(new Set((data || []).map((view: any) => view.media_id)))
     } catch (err) {
       console.error('Error fetching rewarded media:', err)
@@ -155,13 +157,19 @@ export default function CampaignCenterPage() {
     }
 
     if (user) {
+      console.log('Opening status and recording view', { statusId: campaign.id, viewerId: user.id })
       try {
-        await supabase.rpc('record_view', {
+        const { data, error } = await supabase.rpc('record_status_view_with_reward', {
           p_status_id: campaign.id,
           p_viewer_id: user.id
         })
+        if (error) {
+          console.error('record_status_view_with_reward RPC error', { statusId: campaign.id, viewerId: user.id, error })
+        } else {
+          console.log('record_status_view_with_reward response', { statusId: campaign.id, viewerId: user.id, data })
+        }
       } catch (err) {
-        console.error('Failed to record status view:', err)
+        console.error('Failed to record status view:', { statusId: campaign.id, viewerId: user.id, err })
       }
     }
     
@@ -291,7 +299,8 @@ function StatusViewerModal({ statuses, initialIndex, onClose, user, onRewardedUp
   useEffect(() => {
     if (currentMedia) {
       startTimer()
-      // handleReward will be called after viewing duration completes
+      // Call handleReward immediately when media loads (like mobile app)
+      handleReward()
     }
     return () => stopTimer()
   }, [currentIndex, currentMediaIndex, currentMedia])
@@ -312,7 +321,6 @@ function StatusViewerModal({ statuses, initialIndex, onClose, user, onRewardedUp
 
       if (elapsed >= duration) {
         stopTimer()
-        handleReward() // Call reward after full viewing duration
         nextMedia()
       }
     }, interval)
@@ -349,19 +357,28 @@ function StatusViewerModal({ statuses, initialIndex, onClose, user, onRewardedUp
   }
 
   const handleReward = async () => {
-    if (!currentMedia || !user) return
+    if (!currentMedia || !user) {
+      console.log('handleReward skipped - missing context', { currentMediaId: currentMedia?.id, userId: user?.id })
+      return
+    }
 
     // Prevent duplicate rewards for the same media item in this session
     if (viewedMediaIds.current.has(currentMedia.id)) {
+      console.log('handleReward skipped - already handled this media in session', { mediaId: currentMedia.id })
       return;
     }
     viewedMediaIds.current.add(currentMedia.id);
 
     try {
-      const { data } = await supabase.rpc('record_media_view_with_reward', {
+      console.log('Calling record_media_view_with_reward', { mediaId: currentMedia.id, viewerId: user.id })
+      const { data, error } = await supabase.rpc('record_media_view_with_reward', {
         p_media_id: currentMedia.id,
         p_viewer_id: user.id
       })
+      console.log('record_media_view_with_reward response', { mediaId: currentMedia.id, viewerId: user.id, data, error })
+      if (error) {
+        throw error
+      }
       if (data?.success && data?.reward_given) {
         setIsRewarded(true)
         if (onRewardedUpdate) {
@@ -369,6 +386,8 @@ function StatusViewerModal({ statuses, initialIndex, onClose, user, onRewardedUp
         }
         // Hide reward popup after 3 seconds
         setTimeout(() => setIsRewarded(false), 3000)
+      } else {
+        console.log('No reward was given for this media view', { mediaId: currentMedia.id, viewerId: user.id, data })
       }
     } catch (err) {
       console.error('Reward error:', err)
