@@ -18,7 +18,8 @@ import {
   ShieldCheck,
   PlayCircle,
   X,
-  ArrowRight
+  ArrowRight,
+  Share2
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
@@ -29,6 +30,7 @@ export default function CampaignCenterPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [user, setUser] = useState<any>(null)
   const [rewardedMediaIds, setRewardedMediaIds] = useState<Set<string>>(new Set())
+  const [sharingCampaignId, setSharingCampaignId] = useState<string | null>(null)
   
   // Status Viewer State
   const [showStatusViewer, setShowStatusViewer] = useState(false)
@@ -138,6 +140,77 @@ export default function CampaignCenterPage() {
     }
   }
 
+  const handleShare = async (campaign: any) => {
+    if (!user) {
+      alert('Please sign in to share and earn rewards.')
+      return
+    }
+
+    const mediaId = campaign?.media_items?.[0]?.id
+    if (!mediaId) {
+      alert('Unable to generate a share link for this campaign.')
+      return
+    }
+
+    setSharingCampaignId(campaign.id)
+
+    try {
+      const { data: generatedLink, error: generateError } = await supabase.rpc('generate_share_link', {
+        p_media_id: mediaId,
+        p_referrer_id: user.id,
+      })
+
+      if (generateError || !generatedLink) {
+        throw generateError || new Error('Failed to generate share link')
+      }
+
+      const shareText = `Check out this Brandible story from ${campaign.brand.name}! ${generatedLink}`
+
+      if (navigator.share) {
+        await navigator.share({
+          title: campaign.title,
+          text: shareText,
+          url: generatedLink,
+        })
+      } else {
+        await navigator.clipboard.writeText(shareText)
+        alert('Share link copied to clipboard.')
+      }
+
+      const { error: logError } = await supabase.rpc('log_activity', {
+        p_action_type: 'content_shared',
+        p_resource_type: 'status_media',
+        p_resource_id: mediaId,
+        p_metadata: {
+          status_post_id: campaign.id,
+          brand_id: campaign.brand.id,
+          share_link: generatedLink,
+          campaign_type: campaign.type,
+        },
+        p_user_id: user.id,
+      })
+
+      if (logError) {
+        console.warn('Could not log share activity:', logError)
+      }
+
+      if (campaign.type === 'status_view') {
+        const { error: participationError } = await supabase.rpc('increment_status_participation', {
+          p_status_id: campaign.id,
+        })
+
+        if (participationError) {
+          console.warn('Could not increment status participation:', participationError)
+        }
+      }
+    } catch (err) {
+      console.error('Share error:', err)
+      alert('Could not share content at this time.')
+    } finally {
+      setSharingCampaignId(null)
+    }
+  }
+
   const filteredCampaigns = campaigns.filter(c => {
     const matchesTab = filter === 'all' || c.type === filter
     const matchesSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -227,10 +300,12 @@ export default function CampaignCenterPage() {
                  key={camp.id}
                  campaign={camp}
                  completed={isStatusCompleted(camp)}
+                 isSharing={sharingCampaignId === camp.id}
                  onClick={() => {
                    if (camp.type === 'status_view') handleOpenStatus(camp)
                    else router.push(`/dashboard/campaigns/${camp.id}`)
                  }}
+                 onShare={() => handleShare(camp)}
                />
              ))}
           </div>
@@ -521,7 +596,7 @@ function StatusViewerModal({ statuses, initialIndex, onClose, user, onRewardedUp
   )
 }
 
-function CampaignCard({ campaign, completed, onClick }: { campaign: any, completed?: boolean, onClick: () => void }) {
+function CampaignCard({ campaign, completed, onClick, onShare, isSharing }: { campaign: any, completed?: boolean, onClick: () => void, onShare?: () => void, isSharing?: boolean }) {
   const getTypeColor = (type: string) => {
     switch(type) {
       case 'status_view': return 'bg-emerald-50 text-emerald-600'
@@ -579,13 +654,25 @@ function CampaignCard({ campaign, completed, onClick }: { campaign: any, complet
              </div>
           </div>
           
-          <button 
-            onClick={onClick}
-            className="flex items-center gap-2 bg-gray-900 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-brand transition-all shadow-lg active:scale-95"
-          >
-             {campaign.type === 'status_view' ? (completed ? 'VIEW AGAIN' : 'WATCH') : 'DETAILS'}
-             <ChevronRight size={14} />
-          </button>
+          <div className="flex items-center gap-3">
+             <button
+               onClick={(e) => {
+                 e.stopPropagation()
+                 onShare?.()
+               }}
+               disabled={isSharing}
+               className="h-12 w-12 bg-gray-900 text-white rounded-2xl flex items-center justify-center hover:bg-brand transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+             >
+               {isSharing ? <Loader2 size={16} className="animate-spin" /> : <Share2 size={16} />}
+             </button>
+             <button 
+               onClick={onClick}
+               className="flex items-center gap-2 bg-gray-900 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-brand transition-all shadow-lg active:scale-95"
+             >
+               {campaign.type === 'status_view' ? (completed ? 'VIEW AGAIN' : 'WATCH') : 'DETAILS'}
+               <ChevronRight size={14} />
+             </button>
+          </div>
        </div>
 
        {campaign.source_hub_name && (
