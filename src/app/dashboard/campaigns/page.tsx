@@ -156,23 +156,6 @@ export default function CampaignCenterPage() {
       return
     }
 
-    if (user) {
-      console.log('Opening status and recording view', { statusId: campaign.id, viewerId: user.id })
-      try {
-        const { data, error } = await supabase.rpc('record_status_view_with_reward', {
-          p_status_id: campaign.id,
-          p_viewer_id: user.id
-        })
-        if (error) {
-          console.error('record_status_view_with_reward RPC error', { statusId: campaign.id, viewerId: user.id, error })
-        } else {
-          console.log('record_status_view_with_reward response', { statusId: campaign.id, viewerId: user.id, data })
-        }
-      } catch (err) {
-        console.error('Failed to record status view:', { statusId: campaign.id, viewerId: user.id, err })
-      }
-    }
-    
     const indexInFiltered = filteredCampaigns.findIndex(c => c.id === campaign.id)
     setCurrentStatusIndex(indexInFiltered)
     setShowStatusViewer(true)
@@ -291,19 +274,36 @@ function StatusViewerModal({ statuses, initialIndex, onClose, user, onRewardedUp
   const supabase = createClient()
   const router = useRouter()
   const timerRef = useRef<any>(null)
-  const viewedMediaIds = useRef(new Set()); // Added
+  const rewardTimeoutRef = useRef<any>(null)
+  const viewedMediaIds = useRef(new Set());
 
   const currentStatus = statuses[currentIndex]
   const currentMedia = currentStatus?.media_items?.[currentMediaIndex]
 
   useEffect(() => {
-    if (currentMedia) {
-      startTimer()
-      // Call handleReward immediately when media loads (like mobile app)
-      handleReward()
-    }
+    if (!currentMedia) return
+    startTimer()
     return () => stopTimer()
-  }, [currentIndex, currentMediaIndex, currentMedia])
+  }, [currentMedia?.id])
+
+  useEffect(() => {
+    if (!currentMedia || !user) return
+
+    if (viewedMediaIds.current.has(currentMedia.id)) {
+      return
+    }
+
+    rewardTimeoutRef.current = setTimeout(() => {
+      handleReward()
+    }, 50)
+
+    return () => {
+      if (rewardTimeoutRef.current) {
+        clearTimeout(rewardTimeoutRef.current)
+        rewardTimeoutRef.current = null
+      }
+    }
+  }, [currentMedia?.id, user?.id])
 
   const startTimer = () => {
     stopTimer()
