@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, Lock, Mail, Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 
@@ -13,6 +13,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirect = searchParams.get('redirect') || '/dashboard'
   const supabase = createClient()
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -31,7 +33,7 @@ export default function LoginPage() {
       return
     }
 
-    router.push('/dashboard')
+    router.push(redirect)
     router.refresh()
   }
 
@@ -104,7 +106,10 @@ export default function LoginPage() {
 
         <p className="mt-8 text-center text-sm text-gray-600">
           New influencer?{' '}
-          <Link href="/signup" className="font-semibold text-brand hover:text-brand-dark transition-colors">
+          <Link
+            href={redirect ? `/signup?redirect=${encodeURIComponent(redirect)}` : '/signup'}
+            className="font-semibold text-brand hover:text-brand-dark transition-colors"
+          >
             Create an account
           </Link>
         </p>
