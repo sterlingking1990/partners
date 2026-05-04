@@ -632,24 +632,42 @@ export default function CampaignDetailsPage() {
                         </h3>
 
                         <div className="space-y-4">
-                        {(currentQuestion.question_type === 'multiple_choice' || currentQuestion.question_type === 'yes_no') && currentQuestion.options?.map((option: any, idx: number) => (
+                        {currentQuestion.question_type === 'multiple_choice' && currentQuestion.options?.map((option: any, idx: number) => (
                             <button
                                 key={idx}
-                                onClick={() => handleAnswer(currentQuestion.id, option.text, option)}
+                                onClick={() => handleAnswer(currentQuestion.id, option.option_text, option)}
                                 className={`w-full p-6 rounded-2xl text-left font-bold transition-all border-2 flex items-center justify-between group ${
-                                answers[currentQuestion.id] === option.text 
+                                answers[currentQuestion.id] === option.option_text 
                                     ? 'bg-brand/5 border-brand text-brand' 
                                     : 'bg-gray-50 border-transparent text-gray-700 hover:border-gray-200 hover:bg-white'
                                 }`}
                             >
-                                <span>{option.text}</span>
+                                <span>{option.option_text}</span>
                                 <div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                                    answers[currentQuestion.id] === option.text ? 'bg-brand border-brand' : 'border-gray-300'
+                                    answers[currentQuestion.id] === option.option_text ? 'bg-brand border-brand' : 'border-gray-300'
                                 }`}>
-                                    {answers[currentQuestion.id] === option.text && <div className="h-2 w-2 bg-white rounded-full" />}
+                                    {answers[currentQuestion.id] === option.option_text && <div className="h-2 w-2 bg-white rounded-full" />}
                                 </div>
                             </button>
                         ))}
+
+                        {currentQuestion.question_type === 'yes_no' && (
+                            <div className="flex gap-4">
+                                {['Yes', 'No'].map((val) => (
+                                    <button
+                                        key={val}
+                                        onClick={() => handleAnswer(currentQuestion.id, val)}
+                                        className={`flex-1 py-5 rounded-2xl font-black text-sm uppercase tracking-widest transition-all border-2 ${
+                                            answers[currentQuestion.id] === val
+                                                ? 'bg-brand text-white border-brand shadow-lg shadow-brand/30'
+                                                : 'bg-gray-50 text-gray-700 border-transparent hover:border-gray-200 hover:bg-white'
+                                        }`}
+                                    >
+                                        {val}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
 
                         {currentQuestion.question_type === 'rating' && (
                             <div className="flex justify-center gap-3 py-8">
