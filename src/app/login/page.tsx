@@ -15,6 +15,7 @@ export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect') || '/dashboard'
+  const verifiedPending = searchParams.get('verified') === 'pending'
   const supabase = createClient()
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -51,6 +52,11 @@ export default function LoginPage() {
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+          {verifiedPending && (
+            <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg text-sm">
+              Account created! Please check your email to verify your account, then sign in below.
+            </div>
+          )}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
               {error}
