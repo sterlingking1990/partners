@@ -115,13 +115,13 @@ export default function HubsPage() {
       if (hub.state === 'private') {
         const { error } = await supabase
           .from('hub_applications')
-          .insert({ hub_id: hub.id, user_id: user.id, status: 'pending' })
+          .insert({ hub_id: hub.id, profile_id: user.id, status: 'pending' })
         if (error) throw error
         setToastMessage('Application sent to hub owner!')
       } else {
         const { error } = await supabase
           .from('hub_members')
-          .insert({ hub_id: hub.id, user_id: user.id })
+          .insert({ hub_id: hub.id, profile_id: user.id })
         if (error) throw error
         setToastMessage(`Welcome to ${hub.name}!`)
       }
@@ -142,7 +142,7 @@ export default function HubsPage() {
         .from('hub_members')
         .delete()
         .eq('hub_id', hubId)
-        .eq('user_id', user.id)
+        .eq('profile_id', user.id)
       
       if (error) throw error
       setToastMessage('You have left the hub.')

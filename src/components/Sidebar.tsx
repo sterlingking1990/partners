@@ -35,6 +35,7 @@ export default function Sidebar() {
     { icon: <Zap size={20} />, label: "Affiliate Deals", href: "/dashboard/affiliate" },
     { icon: <Globe size={20} />, label: "Community Hubs", href: "/dashboard/hubs" },
     { icon: <MessageSquare size={20} />, label: "Messages", href: "/dashboard/chats" },
+    { icon: <ShoppingBag size={20} />, label: "Shop", href: "/dashboard/shop" },
     { icon: <Wallet size={20} />, label: "My Wallet", href: "/dashboard/wallet" },
     { icon: <User size={20} />, label: "Profile", href: "/dashboard/profile" },
   ]

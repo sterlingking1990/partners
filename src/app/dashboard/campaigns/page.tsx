@@ -22,10 +22,12 @@ import {
   Share2,
   Ticket,
   Sparkles,
-  AlertCircle
+  AlertCircle,
+  Gamepad2
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Toast from '@/components/Toast'
+import MemorizeGame from '@/components/MemorizeGame'
 
 export default function CampaignCenterPage() {
   const [campaigns, setCampaigns] = useState<any[]>([])
@@ -35,6 +37,7 @@ export default function CampaignCenterPage() {
   const [user, setUser] = useState<any>(null)
   const [rewardedMediaIds, setRewardedMediaIds] = useState<Set<string>>(new Set())
   const [sharingCampaignId, setSharingCampaignId] = useState<string | null>(null)
+  const [showGame, setShowGame] = useState(false)
   
   // Status Viewer State
   const [showStatusViewer, setShowStatusViewer] = useState(false)
@@ -310,10 +313,11 @@ export default function CampaignCenterPage() {
                 { id: 'status_view', label: 'Stories', icon: <Zap size={14} /> },
                 { id: 'challenge', label: 'Challenges', icon: <Video size={14} /> },
                 { id: 'survey', label: 'Surveys', icon: <ClipboardList size={14} /> },
+                { id: 'game', label: 'Game', icon: <Gamepad2 size={14} /> },
               ].map(tab => (
                 <button
                   key={tab.id}
-                  onClick={() => setFilter(tab.id)}
+                  onClick={() => { if (tab.id === 'game') { setShowGame(true) } else { setShowGame(false); setFilter(tab.id) } }}
                   className={`px-5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
                     filter === tab.id ? 'bg-brand text-white shadow-lg shadow-brand/20' : 'text-gray-500 hover:bg-gray-50'
                   }`}
@@ -325,8 +329,18 @@ export default function CampaignCenterPage() {
            </div>
         </div>
 
+        {showGame && (
+          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl overflow-hidden">
+            <MemorizeGame
+              user={user}
+              onClose={() => { setShowGame(false); setFilter('all') }}
+              onCoinsUpdated={fetchData}
+            />
+          </div>
+        )}
+
         {/* Search & Stats */}
-        <div className="relative group">
+        {!showGame && <div className="relative group">
            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand transition-colors" size={20} />
            <input 
              type="text"
@@ -335,9 +349,9 @@ export default function CampaignCenterPage() {
              placeholder="Search by brand or campaign title..."
              className="w-full pl-12 pr-4 py-4 bg-white border border-gray-100 rounded-[2rem] shadow-sm focus:ring-2 focus:ring-brand outline-none transition-all"
            />
-        </div>
+        </div>}
 
-        {loading ? (
+        {!showGame && loading ? (
           <div className="flex flex-col items-center justify-center py-32 space-y-4">
              <Loader2 className="animate-spin text-brand" size={40} />
              <p className="text-gray-500 font-bold uppercase tracking-widest text-[10px] animate-pulse">Syncing Marketplace...</p>
