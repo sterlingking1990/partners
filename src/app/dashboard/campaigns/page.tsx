@@ -178,7 +178,7 @@ export default function CampaignCenterPage() {
       const url = new URL(generatedLink)
       const code = url.searchParams.get('redeem_code')
 
-      const shareText = `🔥 Check this out on Brandible! Use my code [${code}] in your Influencer App to earn ${campaign.share_reward_redeemer || 0} BC instantly. Link: ${generatedLink}`
+      const shareText = `🔥 Check this out on Brandible! Use my code [${code}] in your Influencer App to earn ${Math.round((campaign.reward_amount || 0) * 0.9)} BC instantly. Link: ${generatedLink}`
 
       if (navigator.share) {
         await navigator.share({
@@ -691,7 +691,7 @@ function CampaignCard({ campaign, completed, onClick, onShare, isSharing }: { ca
     }
   }
 
-  const hasShareRewards = (campaign.share_reward_referrer || 0) > 0 || (campaign.share_reward_redeemer || 0) > 0
+  const hasShareRewards = (campaign.reward_amount || 0) > 0 && (campaign.media_items?.length || 0) > 0
 
   return (
     <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm hover:shadow-xl hover:border-brand/30 transition-all group flex flex-col h-full relative overflow-hidden">
@@ -724,7 +724,7 @@ function CampaignCard({ campaign, completed, onClick, onShare, isSharing }: { ca
              <div className="flex items-center gap-2 pt-2">
                 <div className="flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">
                    <Share2 size={12} className="text-emerald-600" />
-                   <span className="text-[10px] font-black text-emerald-600 uppercase tracking-tighter">Share to Earn {campaign.share_reward_referrer} BC</span>
+                   <span className="text-[10px] font-black text-emerald-600 uppercase tracking-tighter">Share to Earn {Math.round((campaign.reward_amount || 0) * 0.1)} BC</span>
                 </div>
              </div>
           )}
