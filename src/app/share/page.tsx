@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 
@@ -39,7 +39,7 @@ function removePendingReferral() {
   }
 }
 
-export default function SharePage() {
+function SharePageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [status, setStatus] = useState<'loading' | 'redirecting' | 'processing' | 'success' | 'error' | 'missing'>('loading')
@@ -184,5 +184,13 @@ export default function SharePage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function SharePage() {
+  return (
+    <Suspense>
+      <SharePageContent />
+    </Suspense>
   )
 }

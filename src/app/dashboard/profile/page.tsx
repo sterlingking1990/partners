@@ -27,7 +27,10 @@ import {
   Star,
   Users,
   Award,
-  Hash
+  Hash,
+  Plus,
+  Copy,
+  Share2
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Toast from '@/components/Toast'
@@ -49,6 +52,12 @@ export default function InfluencerProfilePage() {
 
   const [showToast, setShowToast] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
+  const [hub, setHub] = useState<any>(null)
+  const [hubApplication, setHubApplication] = useState<any>(null)
+  const [isCreatingHub, setIsCreatingHub] = useState(false)
+  const [isApplyingHub, setIsApplyingHub] = useState(false)
+  const [hubFormData, setHubFormData] = useState({ name: '', description: '' })
+  const [applyFormData, setApplyFormData] = useState({ community_name: '', platform: 'WhatsApp', group_link: '', member_count: '', niche: '' })
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
@@ -74,6 +83,15 @@ export default function InfluencerProfilePage() {
         .single()
       
       setProfile(profileData)
+      // Fetch hub data
+      if (profileData) {
+        const [hubRes, appRes] = await Promise.all([
+          supabase.from('hubs').select('*').eq('owner_id', user.id).maybeSingle(),
+          supabase.from('hub_applications').select('*').eq('profile_id', user.id).order('created_at', { ascending: false }).limit(1).maybeSingle()
+        ])
+        setHub(hubRes.data || null)
+        setHubApplication(appRes.data || null)
+      }
       if (profileData) {
         setFormData({
           full_name: profileData.full_name || '',
@@ -89,6 +107,65 @@ export default function InfluencerProfilePage() {
       console.error(err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleCreateHub = async () => {
+    if (!hubFormData.name || !hubFormData.description) {
+      alert('Please fill in the hub name and description.')
+      return
+    }
+    setUpdating(true)
+    try {
+      const { data, error } = await supabase.rpc('create_influencer_hub', {
+        p_name: hubFormData.name,
+        p_description: hubFormData.description,
+        p_industry: 'General',
+      })
+      if (error) throw error
+      if (data.success) {
+        setHub({ id: data.hub_id, name: hubFormData.name, description: hubFormData.description, invite_code: data.invite_code })
+        setIsCreatingHub(false)
+        setToastMessage(`Hub created! Invite code: ${data.invite_code}`)
+        setShowToast(true)
+        if (hubFormData.description) {
+          supabase.functions.invoke('generate-hub-keywords', { body: { hub_id: data.hub_id, description: hubFormData.description } }).catch(() => {})
+        }
+      } else {
+        alert(data.message || 'Failed to create hub.')
+      }
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const handleApplyHub = async () => {
+    if (!applyFormData.community_name || !applyFormData.group_link) {
+      alert('Please provide your community name and group link.')
+      return
+    }
+    setUpdating(true)
+    try {
+      const { error } = await supabase.from('hub_applications').insert({
+        profile_id: profile.id,
+        community_name: applyFormData.community_name,
+        platform: applyFormData.platform,
+        group_link: applyFormData.group_link,
+        member_count: parseInt(applyFormData.member_count) || 0,
+        niche: applyFormData.niche,
+      })
+      if (error) throw error
+      setIsApplyingHub(false)
+      setToastMessage('Application submitted! We will review and notify you.')
+      setShowToast(true)
+      const { data } = await supabase.from('hub_applications').select('*').eq('profile_id', profile.id).order('created_at', { ascending: false }).limit(1).maybeSingle()
+      setHubApplication(data)
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setUpdating(false)
     }
   }
 
@@ -338,12 +415,88 @@ export default function InfluencerProfilePage() {
                       </div>
                    </div>
 
+                   {/* My Community Hub */}
+                   <div className="bg-white rounded-[2.5rem] p-6 border border-gray-100 shadow-sm space-y-4">
+                      <div className="flex items-center justify-between">
+                         <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">My Community Hub</h3>
+                         {profile?.can_create_hub && !hub && !isCreatingHub && !isApplyingHub && (
+                           <button onClick={() => setIsCreatingHub(true)} className="h-8 w-8 bg-brand/10 text-brand rounded-xl flex items-center justify-center hover:bg-brand/20 transition-colors">
+                             <Plus size={16} />
+                           </button>
+                         )}
+                      </div>
+
+                      {isCreatingHub ? (
+                        <div className="space-y-3">
+                          <p className="text-xs text-gray-500">Create a hub to invite your followers and earn 10% from their rewards!</p>
+                          <input value={hubFormData.name} onChange={e => setHubFormData({...hubFormData, name: e.target.value})} placeholder="Hub Name (e.g. Lagos Techies)" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand" />
+                          <textarea value={hubFormData.description} onChange={e => setHubFormData({...hubFormData, description: e.target.value})} placeholder="What interests and values define your community?" rows={3} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand" />
+                          <div className="flex gap-2">
+                            <button onClick={() => setIsCreatingHub(false)} className="flex-1 py-3 border border-gray-200 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-50">Cancel</button>
+                            <button onClick={handleCreateHub} disabled={updating} className="flex-[2] py-3 bg-brand text-white rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-50 flex items-center justify-center gap-2">
+                              {updating ? <Loader2 size={14} className="animate-spin" /> : 'Create My Hub'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : hub ? (
+                        <div className="space-y-3">
+                          <div>
+                            <p className="font-bold text-gray-900">{hub.name}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">{hub.description}</p>
+                          </div>
+                          <div className="flex items-center gap-2 p-3 bg-brand/5 border border-brand/10 rounded-xl">
+                            <span className="font-black text-brand text-lg tracking-widest flex-1">{hub.invite_code}</span>
+                            <button onClick={() => { navigator.clipboard.writeText(hub.invite_code); setToastMessage('Code copied!'); setShowToast(true) }} className="p-2 hover:bg-brand/10 rounded-lg transition-colors">
+                              <Copy size={16} className="text-brand" />
+                            </button>
+                            <button onClick={() => navigator.share?.({ text: `Join my "${hub.name}" community on Brandible with code ${hub.invite_code}!` })} className="p-2 hover:bg-brand/10 rounded-lg transition-colors">
+                              <Share2 size={16} className="text-brand" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : profile?.can_create_hub ? (
+                        <div className="text-center py-4 space-y-3">
+                          <Users size={40} className="mx-auto text-gray-300" />
+                          <p className="text-sm font-bold text-gray-600">You are verified to lead a community!</p>
+                          <button onClick={() => setIsCreatingHub(true)} className="px-6 py-3 bg-brand text-white rounded-xl text-xs font-black uppercase tracking-widest">Create Your Hub Now</button>
+                        </div>
+                      ) : hubApplication ? (
+                        <div className={`p-4 rounded-2xl text-center space-y-1 ${hubApplication.status === 'approved' ? 'bg-emerald-50 border border-emerald-100' : hubApplication.status === 'rejected' ? 'bg-red-50 border border-red-100' : 'bg-gray-50 border border-gray-100'}`}>
+                          <p className="font-black text-sm">{hubApplication.status === 'pending' ? '⏳ Application Pending' : hubApplication.status === 'approved' ? '✅ Application Approved!' : '❌ Application Rejected'}</p>
+                          <p className="text-xs text-gray-500">We will notify you once reviewed.</p>
+                        </div>
+                      ) : isApplyingHub ? (
+                        <div className="space-y-3">
+                          <p className="text-xs text-gray-500">Tell us about your community to get verified as a hub owner.</p>
+                          <input value={applyFormData.community_name} onChange={e => setApplyFormData({...applyFormData, community_name: e.target.value})} placeholder="Community Name" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand" />
+                          <select value={applyFormData.platform} onChange={e => setApplyFormData({...applyFormData, platform: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none">
+                            <option>WhatsApp</option><option>Telegram</option><option>Facebook</option><option>Other</option>
+                          </select>
+                          <input value={applyFormData.group_link} onChange={e => setApplyFormData({...applyFormData, group_link: e.target.value})} placeholder="Group Link (for verification)" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand" />
+                          <input value={applyFormData.member_count} onChange={e => setApplyFormData({...applyFormData, member_count: e.target.value})} placeholder="Approx. Member Count" type="number" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand" />
+                          <input value={applyFormData.niche} onChange={e => setApplyFormData({...applyFormData, niche: e.target.value})} placeholder="Community Niche (e.g. Tech, Fashion)" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand" />
+                          <div className="flex gap-2">
+                            <button onClick={() => setIsApplyingHub(false)} className="flex-1 py-3 border border-gray-200 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-50">Cancel</button>
+                            <button onClick={handleApplyHub} disabled={updating} className="flex-[2] py-3 bg-brand text-white rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-50 flex items-center justify-center gap-2">
+                              {updating ? <Loader2 size={14} className="animate-spin" /> : 'Submit Application'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-4 space-y-3">
+                          <Users size={40} className="mx-auto text-gray-300" />
+                          <p className="text-xs text-gray-500">Apply to become a verified hub owner and earn from your community.</p>
+                          <button onClick={() => setIsApplyingHub(true)} className="px-6 py-3 bg-gray-900 text-white rounded-xl text-xs font-black uppercase tracking-widest">Apply to Create a Hub</button>
+                        </div>
+                      )}
+                   </div>
+
                    <div className="bg-white rounded-[2.5rem] p-4 border border-gray-100 shadow-sm">
                       <div className="p-4 border-b border-gray-50 mb-2">
                          <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Earnings & Finance</h3>
                       </div>
-                      <SettingItem icon={<Wallet className="text-emerald-600" />} label="Payout Wallet" sub="Withdraw your BC earnings" href="/dashboard/wallet" router={router} />
-                      <SettingItem icon={<History className="text-blue-600" />} label="My Hubs" sub="Communities you've joined" href="/dashboard/hubs" router={router} />
+                      <SettingItem icon={<Wallet className="text-emerald-600" />} label="Payout Wallet" sub="Withdraw your BC earnings" href="/dashboard/wallet" />
+                      <SettingItem icon={<History className="text-blue-600" />} label="My Hubs" sub="Communities you've joined" href="/dashboard/hubs" />
                       <SettingItem icon={<ShieldCheck className="text-brand" />} label="Identity Verification" sub="Account security & status" />
                    </div>
                 </div>
@@ -398,7 +551,8 @@ export default function InfluencerProfilePage() {
   )
 }
 
-function SettingItem({ icon, label, sub, href, router }: any) {
+function SettingItem({ icon, label, sub, href }: any) {
+  const router = useRouter()
   return (
     <button 
       className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-all group"

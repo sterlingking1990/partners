@@ -48,7 +48,7 @@ export default function MemorizeGame({ user, onClose, onCoinsUpdated }: Props) {
     minWordLength: 3, maxWordLength: 7,
   })
 
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const flashingRef = useRef(false)
 
   useEffect(() => {
@@ -152,14 +152,14 @@ export default function MemorizeGame({ user, onClose, onCoinsUpdated }: Props) {
         .order('created_at', { ascending: false })
       if (error || !interactions?.length) return
 
-      const campaignIds = [...new Set(interactions.map((i: any) => i.campaign_id))]
+      const campaignIds = Array.from(new Set(interactions.map((i: any) => i.campaign_id)))
       const campaigns: any[] = []
       for (const cid of campaignIds) {
         const { data } = await supabase.rpc('get_campaign_by_id_safe', { p_campaign_id: cid })
         if (data?.[0]) campaigns.push(data[0])
       }
 
-      const brandIds = [...new Set(campaigns.map((c: any) => c.brand_id).filter(Boolean))]
+      const brandIds = Array.from(new Set(campaigns.map((c: any) => c.brand_id).filter(Boolean)))
       let brandMap: Record<string, string> = {}
       if (brandIds.length) {
         const { data: brands } = await supabase.from('brands').select('id, company_name').in('id', brandIds)
@@ -233,7 +233,7 @@ export default function MemorizeGame({ user, onClose, onCoinsUpdated }: Props) {
 
     // Build grid
     const gridSize = settings.cols * settings.rows
-    const wordLetters = [...new Set(word.split(''))]
+    const wordLetters = Array.from(new Set(word.split('')))
     const fillers = ALPHABET.filter(l => !wordLetters.includes(l))
       .sort(() => Math.random() - 0.5)
       .slice(0, gridSize - wordLetters.length)
