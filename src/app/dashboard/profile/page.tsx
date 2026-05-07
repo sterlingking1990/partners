@@ -27,6 +27,7 @@ import {
   Star,
   Users,
   Award,
+  Megaphone,
   Hash,
   Plus,
   Copy,
@@ -53,6 +54,7 @@ export default function InfluencerProfilePage() {
   const [showToast, setShowToast] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
   const [hub, setHub] = useState<any>(null)
+  const [showPromoRequests, setShowPromoRequests] = useState(false)
   const [hubApplication, setHubApplication] = useState<any>(null)
   const [isCreatingHub, setIsCreatingHub] = useState(false)
   const [isApplyingHub, setIsApplyingHub] = useState(false)
@@ -497,6 +499,7 @@ export default function InfluencerProfilePage() {
                       </div>
                       <SettingItem icon={<Wallet className="text-emerald-600" />} label="Payout Wallet" sub="Withdraw your BC earnings" href="/dashboard/wallet" />
                       <SettingItem icon={<History className="text-blue-600" />} label="My Hubs" sub="Communities you've joined" href="/dashboard/hubs" />
+                      {hub && <SettingItem icon={<Megaphone className="text-indigo-600" />} label="Promotion Requests" sub="Review brand requests for your hub" onClick={() => setShowPromoRequests(true)} />}
                       <SettingItem icon={<ShieldCheck className="text-brand" />} label="Identity Verification" sub="Account security & status" />
                    </div>
                 </div>
@@ -547,16 +550,123 @@ export default function InfluencerProfilePage() {
            </div>
         </div>
       </main>
+      {showPromoRequests && hub && <PromoRequestsDrawer hubId={hub.id} onClose={() => setShowPromoRequests(false)} />}
     </div>
   )
 }
 
-function SettingItem({ icon, label, sub, href }: any) {
+function PromoRequestsDrawer({ hubId, onClose }: { hubId: string; onClose: () => void }) {
+  const [requests, setRequests] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [updating, setUpdating] = useState<string | null>(null)
+  const supabase = createClient()
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase
+        .from('promotion_requests')
+        .select('*, brands:brand_id(company_name, profiles!brands_profile_id_fkey(avatar_url))')
+        .eq('hub_id', hubId)
+        .order('created_at', { ascending: false })
+      setRequests(data || [])
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  const updateStatus = async (id: string, status: string) => {
+    setUpdating(id)
+    await supabase.from('promotion_requests').update({ status }).eq('id', id)
+    setRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r))
+    setUpdating(null)
+  }
+
+  const statusColor: Record<string, string> = {
+    pending: 'bg-yellow-100 text-yellow-700',
+    accepted: 'bg-emerald-100 text-emerald-700',
+    declined: 'bg-red-100 text-red-700',
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-white h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <Megaphone size={20} className="text-brand" />
+            <h2 className="text-lg font-black text-gray-900">Promotion Requests</h2>
+          </div>
+          <button onClick={onClose} className="h-9 w-9 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors">
+            <X size={20} className="text-gray-500" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {loading ? (
+            <div className="flex justify-center pt-20"><Loader2 className="animate-spin text-brand" size={32} /></div>
+          ) : requests.length === 0 ? (
+            <div className="flex flex-col items-center justify-center pt-20 text-center">
+              <Megaphone size={48} className="text-gray-200 mb-4" />
+              <p className="font-bold text-gray-500">No Promotion Requests Yet</p>
+              <p className="text-sm text-gray-400 mt-1">Brands will send requests here when they want to promote in your hub.</p>
+            </div>
+          ) : requests.map((req) => (
+            <div key={req.id} className="bg-gray-50 rounded-2xl overflow-hidden">
+              <div className="p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <img src={req.brands?.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${req.brands?.company_name}&background=random`}
+                    className="h-10 w-10 rounded-xl object-cover" alt="" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-gray-900 text-sm">{req.brands?.company_name}</p>
+                    <p className="text-xs text-gray-400">{new Date(req.created_at).toLocaleDateString()}</p>
+                  </div>
+                  <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-lg ${statusColor[req.status]}`}>{req.status}</span>
+                </div>
+
+                <div>
+                  <p className="font-bold text-gray-800">{req.title}</p>
+                  <p className="text-sm text-gray-500 mt-1 leading-relaxed">{req.description}</p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Coins size={14} className="text-emerald-600" />
+                  <span className="text-sm font-black text-emerald-600">{req.reward_amount} BC reward</span>
+                </div>
+
+                {req.media_url && (
+                  <a href={req.media_url} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-xs font-semibold text-brand bg-brand/5 px-3 py-2 rounded-xl hover:bg-brand/10 transition-colors w-fit">
+                    <Star size={14} /> View Product Media
+                  </a>
+                )}
+              </div>
+
+              {req.status === 'pending' && (
+                <div className="flex border-t border-gray-200">
+                  <button onClick={() => updateStatus(req.id, 'declined')} disabled={updating === req.id}
+                    className="flex-1 py-3 text-sm font-bold text-red-500 hover:bg-red-50 transition-colors border-r border-gray-200 disabled:opacity-50">
+                    Decline
+                  </button>
+                  <button onClick={() => updateStatus(req.id, 'accepted')} disabled={updating === req.id}
+                    className="flex-1 py-3 text-sm font-bold text-white bg-brand hover:opacity-90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                    {updating === req.id ? <Loader2 size={14} className="animate-spin" /> : 'Accept'}
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SettingItem({ icon, label, sub, href, onClick }: any) {
   const router = useRouter()
   return (
     <button 
       className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-all group"
-      onClick={() => href && router.push(href)}
+      onClick={() => { if (onClick) onClick(); else if (href) router.push(href) }}
     >
        <div className="flex items-center gap-4">
           <div className="h-12 w-12 bg-gray-50 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform group-hover:bg-white border border-transparent group-hover:border-gray-100">
