@@ -40,7 +40,6 @@ export default function MemorizeGame({ user, onClose, onCoinsUpdated }: Props) {
   const [campaignTriggers, setCampaignTriggers] = useState<any[]>([])
   const [earnedCampaigns, setEarnedCampaigns] = useState<any[]>([])
   const [activeTrigger, setActiveTrigger] = useState<any>(null)
-  const [interactedCampaigns, setInteractedCampaigns] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [settings, setSettings] = useState({
     cols: 4, rows: 4, stagesPerLevel: 5, flashMs: 800, flashGapMs: 300,
@@ -67,7 +66,6 @@ export default function MemorizeGame({ user, onClose, onCoinsUpdated }: Props) {
       const [loadedWords] = await Promise.all([fetchWords(loadedSettings), fetchMaxLevel()])
       console.log('[Game] init complete')
       await prepareStage(1, 1, loadedWords)
-      fetchCampaignHistory()
     } catch (e) {
       console.error('[Game] init error:', e)
       setMessage('Failed to load game. Please try again.')
@@ -142,58 +140,6 @@ export default function MemorizeGame({ user, onClose, onCoinsUpdated }: Props) {
     }
   }
 
-  const fetchCampaignHistory = async () => {
-    try {
-      const { data: interactions, error } = await supabase
-        .from('game_campaign_interactions')
-        .select('trigger_word, coins_earned, campaign_id')
-        .eq('influencer_id', user.id)
-        .eq('success', true)
-        .order('created_at', { ascending: false })
-      if (error || !interactions?.length) return
-
-      const campaignIds = Array.from(new Set(interactions.map((i: any) => i.campaign_id)))
-      const campaigns: any[] = []
-      for (const cid of campaignIds) {
-        const { data } = await supabase.rpc('get_campaign_by_id_safe', { p_campaign_id: cid })
-        if (data?.[0]) campaigns.push(data[0])
-      }
-
-      const brandIds = Array.from(new Set(campaigns.map((c: any) => c.brand_id).filter(Boolean)))
-      let brandMap: Record<string, string> = {}
-      if (brandIds.length) {
-        const { data: brands } = await supabase.from('brands').select('id, company_name').in('id', brandIds)
-        brands?.forEach((b: any) => { brandMap[b.id] = b.company_name })
-      }
-
-      const aggregated = interactions.reduce((acc: any, i: any) => {
-        const camp = campaigns.find((c: any) => c.id === i.campaign_id)
-        if (!acc[i.campaign_id]) {
-          acc[i.campaign_id] = {
-            campaign_id: i.campaign_id,
-            campaign_name: camp?.campaign_name || 'Campaign',
-            brand_name: brandMap[camp?.brand_id] || 'Brand',
-            campaign_message: camp?.campaign_message,
-            campaign_link: camp?.campaign_link,
-            cta_text: camp?.cta_text,
-            media_url: camp?.media_url,
-            all_triggers: camp?.game_triggers || [],
-            campaign_status: camp?.status,
-            total_earned: 0,
-            unlocked_triggers: [],
-          }
-        }
-        acc[i.campaign_id].total_earned += parseFloat(i.coins_earned || 0)
-        if (!acc[i.campaign_id].unlocked_triggers.includes(i.trigger_word))
-          acc[i.campaign_id].unlocked_triggers.push(i.trigger_word)
-        return acc
-      }, {})
-
-      setInteractedCampaigns(Object.values(aggregated).slice(0, 5))
-    } catch (e) {
-      console.error('[Game] fetchCampaignHistory error:', e)
-    }
-  }
 
   const prepareStage = useCallback(async (lvl: number, stg: number, wordsOverride?: Record<number, string[]>) => {
     if (timerRef.current) clearInterval(timerRef.current)
@@ -326,8 +272,7 @@ export default function MemorizeGame({ user, onClose, onCoinsUpdated }: Props) {
           setEarnedCampaigns(prev => [...prev, { name: trigger.campaign_name, reward }])
           setMessage(`Correct! +${reward} BC sponsor bonus! 💰`)
           onCoinsUpdated()
-          fetchCampaignHistory()
-        }
+            }
       } catch {}
     }
 
@@ -500,54 +445,6 @@ export default function MemorizeGame({ user, onClose, onCoinsUpdated }: Props) {
             <div key={i} className="flex items-center justify-between px-4 py-2 bg-emerald-50 border border-emerald-100 rounded-xl">
               <span className="text-xs font-bold text-gray-700">{c.name}</span>
               <span className="text-xs font-black text-emerald-600">+{c.reward} BC</span>
-            </div>
-          ))}
-        </div>
-      )}
-      {/* Campaign history */}
-      {interactedCampaigns.length > 0 && (
-        <div className="w-full space-y-3 pt-2 border-t border-gray-100">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Sponsor History</p>
-          {interactedCampaigns.map((c: any) => (
-            <div key={c.campaign_id} className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
-              {c.media_url && (
-                <div className="relative">
-                  <img src={c.media_url} alt={c.campaign_name} className="w-full h-28 object-cover" />
-                  {c.campaign_status !== 'active' && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                      <span className="text-white text-xs font-black uppercase tracking-widest">Campaign Ended</span>
-                    </div>
-                  )}
-                </div>
-              )}
-              <div className="p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-black text-gray-900 text-sm">{c.campaign_name}</p>
-                    <p className="text-[10px] text-gray-400">by {c.brand_name}</p>
-                  </div>
-                  <span className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-black">+{c.total_earned.toFixed(1)} BC</span>
-                </div>
-                {c.campaign_message && <p className="text-xs text-gray-500 line-clamp-2">{c.campaign_message}</p>}
-                <div className="flex flex-wrap gap-1.5">
-                  {c.unlocked_triggers.map((t: string, i: number) => (
-                    <span key={i} className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 border border-emerald-100 rounded-full text-[10px] font-black text-emerald-700">
-                      {t} ✓
-                    </span>
-                  ))}
-                  {c.all_triggers.filter((t: string) => !c.unlocked_triggers.includes(t)).map((t: string, i: number) => (
-                    <span key={i} className="flex items-center gap-1 px-2 py-0.5 bg-gray-50 border border-gray-200 rounded-full text-[10px] font-black text-gray-400">
-                      {t} 🔒
-                    </span>
-                  ))}
-                </div>
-                {c.campaign_link && c.campaign_status === 'active' && (
-                  <a href={c.campaign_link} target="_blank" rel="noopener noreferrer"
-                    className="block w-full py-2 bg-brand text-white rounded-xl text-xs font-black uppercase tracking-widest text-center hover:opacity-90 transition-opacity">
-                    {c.cta_text || 'Learn More'}
-                  </a>
-                )}
-              </div>
             </div>
           ))}
         </div>

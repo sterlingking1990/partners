@@ -21,6 +21,7 @@ import {
   Star
 } from 'lucide-react'
 import Link from 'next/link'
+import ArcadeModeCard from '@/components/ArcadeModeCard'
 
 export default async function InfluencerDashboardPage() {
   const supabase = createClient()
@@ -177,14 +178,7 @@ export default async function InfluencerDashboardPage() {
           
           {/* Quick Tasks & Community */}
           <div className="space-y-8">
-            <div className="glass-card rounded-[2rem] p-8 bg-gray-900 text-white relative overflow-hidden group">
-               <div className="absolute top-0 right-0 w-32 h-32 bg-brand/20 rounded-full blur-3xl -mr-10 -mt-10" />
-               <h3 className="text-xl font-bold mb-2">Arcade Mode</h3>
-               <p className="text-white/50 text-xs leading-relaxed mb-6">Play games, spot brand sponsor words and earn coins instantly.</p>
-               <button className="w-full py-4 bg-brand text-white font-black rounded-2xl shadow-xl shadow-brand/20 hover:scale-[1.02] active:scale-95 transition-all text-xs uppercase tracking-widest">
-                  Launch Game
-               </button>
-            </div>
+            <ArcadeModeCard user={user} />
 
             <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm">
                <h3 className="text-lg font-black text-gray-900 uppercase tracking-widest mb-6">Top Communities</h3>
