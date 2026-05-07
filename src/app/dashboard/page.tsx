@@ -61,6 +61,8 @@ export default async function InfluencerDashboardPage() {
     .select('hub_id')
     .eq('profile_id', user.id)
 
+  const { data: topHubs } = await supabase.rpc('get_hubs_leaderboard')
+
   const totalParticipations = (completedSurveys?.length || 0) + (completedChallenges?.length || 0)
   const hubsCount = joinedHubs?.length || 0
 
@@ -183,18 +185,21 @@ export default async function InfluencerDashboardPage() {
             <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm">
                <h3 className="text-lg font-black text-gray-900 uppercase tracking-widest mb-6">Top Communities</h3>
                <div className="space-y-4">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="flex items-center gap-4 p-4 hover:bg-gray-50 rounded-2xl transition-all cursor-pointer border border-transparent hover:border-gray-100">
+                  {(topHubs || []).sort((a: any, b: any) => b.member_count - a.member_count).slice(0, 3).map((hub: any) => (
+                    <Link key={hub.id} href="/dashboard/hubs" className="flex items-center gap-4 p-4 hover:bg-gray-50 rounded-2xl transition-all cursor-pointer border border-transparent hover:border-gray-100">
                        <div className="h-10 w-10 rounded-xl bg-gray-100 flex items-center justify-center font-bold text-gray-400 text-sm">
-                          H
+                          {hub.name?.charAt(0).toUpperCase()}
                        </div>
                        <div className="flex-1">
-                          <p className="text-sm font-bold text-gray-900">Tech Explorers</p>
-                          <p className="text-[10px] text-gray-400 font-black uppercase tracking-wider">2.4k Members</p>
+                          <p className="text-sm font-bold text-gray-900">{hub.name}</p>
+                          <p className="text-[10px] text-gray-400 font-black uppercase tracking-wider">{hub.member_count?.toLocaleString()} Members</p>
                        </div>
                        <ChevronRight size={16} className="text-gray-300" />
-                    </div>
+                    </Link>
                   ))}
+                  {(!topHubs || topHubs.length === 0) && (
+                    <p className="text-xs text-gray-400 text-center py-4">No communities yet</p>
+                  )}
                </div>
                <Link href="/dashboard/hubs" className="block mt-6 w-full py-3 bg-gray-50 text-gray-400 text-center rounded-xl text-[10px] font-black uppercase tracking-widest hover:text-brand transition-colors">
                   View All Hubs

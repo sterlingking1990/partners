@@ -56,6 +56,7 @@ export default function InfluencerProfilePage() {
   const [hub, setHub] = useState<any>(null)
   const [showPromoRequests, setShowPromoRequests] = useState(false)
   const [hubApplication, setHubApplication] = useState<any>(null)
+  const [stats, setStats] = useState({ participations: 0, hubMembers: null as number | null, successRate: null as number | null, affiliateEarned: 0 })
   const [isCreatingHub, setIsCreatingHub] = useState(false)
   const [isApplyingHub, setIsApplyingHub] = useState(false)
   const [hubFormData, setHubFormData] = useState({ name: '', description: '' })
@@ -87,12 +88,33 @@ export default function InfluencerProfilePage() {
       setProfile(profileData)
       // Fetch hub data
       if (profileData) {
-        const [hubRes, appRes] = await Promise.all([
-          supabase.from('hubs').select('*').eq('owner_id', user.id).maybeSingle(),
-          supabase.from('hub_applications').select('*').eq('profile_id', user.id).order('created_at', { ascending: false }).limit(1).maybeSingle()
+        const [hubRes, appRes, challengeRes, surveyRes, statusRes, unboxRes] = await Promise.all([
+          supabase.from('hubs').select('id, name, description, invite_code').eq('owner_id', user.id).maybeSingle(),
+          supabase.from('hub_applications').select('*').eq('profile_id', user.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+          supabase.from('challenge_submissions').select('id', { count: 'exact', head: true }).eq('participant_id', user.id),
+          supabase.from('survey_responses').select('id', { count: 'exact', head: true }).eq('respondent_id', user.id),
+          supabase.from('status_views').select('id', { count: 'exact', head: true }).eq('viewer_id', user.id),
+          supabase.from('unboxed_submissions').select('total_earned_by_influencer').eq('influencer_id', user.id),
         ])
         setHub(hubRes.data || null)
         setHubApplication(appRes.data || null)
+
+        const participations = (challengeRes.count || 0) + (surveyRes.count || 0) + (statusRes.count || 0)
+        const affiliateEarned = (unboxRes.data || []).reduce((sum: number, s: any) => sum + (Number(s.total_earned_by_influencer) || 0), 0)
+
+        let hubMembers: number | null = null
+        let successRate: number | null = null
+        if (hubRes.data?.id) {
+          const [membersRes, leaderboardRes] = await Promise.all([
+            supabase.from('hub_members').select('id', { count: 'exact', head: true }).eq('hub_id', hubRes.data.id),
+            supabase.rpc('get_hubs_leaderboard')
+          ])
+          hubMembers = membersRes.count ?? null
+          const myHubStats = (leaderboardRes.data || []).find((h: any) => h.id === hubRes.data.id)
+          successRate = myHubStats ? Number(myHubStats.member_success_rate) : null
+        }
+
+        setStats({ participations, hubMembers, successRate, affiliateEarned })
       }
       if (profileData) {
         setFormData({
@@ -520,9 +542,10 @@ export default function InfluencerProfilePage() {
                        <p className="text-white/40 text-[10px] font-black uppercase tracking-widest mt-1">Growth Metrics</p>
                     </div>
                     <div className="space-y-4 pt-4">
-                       <StatRow label="Participations" value={profile?.followers_count || 0} />
-                       <StatRow label="Success Rate" value="98%" />
-                       <StatRow label="Profile Views" value={profile?.following_count || 0} />
+                       <StatRow label="Participations" value={stats.participations.toLocaleString()} />
+                       <StatRow label="Hub Members" value={stats.hubMembers !== null ? stats.hubMembers.toLocaleString() : '\u2014'} />
+                       <StatRow label="Hub Success Rate" value={stats.successRate !== null ? `${stats.successRate.toFixed(1)}%` : '\u2014'} />
+                       <StatRow label="Affiliate Earned" value={`${stats.affiliateEarned.toLocaleString()} BC`} />
                     </div>
                  </div>
               </div>

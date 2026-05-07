@@ -12,6 +12,7 @@ import {
   TrendingUp,
   Tag,
   ShieldCheck,
+  Coins,
   Megaphone,
   BarChart3,
   MapPin,
@@ -28,6 +29,7 @@ import {
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Toast from '@/components/Toast'
+import UnboxSubmitModal from '@/components/UnboxSubmitModal'
 import MediaCarouselModal from '@/components/MediaCarouselModal'
 
 export default function HubsPage() {
@@ -45,6 +47,7 @@ export default function HubsPage() {
   // Preview Modal State
   const [showPreview, setShowPreview] = useState(false)
   const [previewMedia, setPreviewMedia] = useState<any[]>([])
+  const [unboxModal, setUnboxModal] = useState<{ hubId: string, hubName: string } | null>(null)
 
   const supabase = createClient()
   const router = useRouter()
@@ -231,11 +234,13 @@ export default function HubsPage() {
                <HubCard 
                 key={hub.id} 
                 hub={hub} 
+                userId={user?.id}
                 unboxedItems={unboxedByHub[hub.id] || []}
                 isProcessing={processingId === hub.id}
                 onJoin={() => handleJoinHub(hub)}
                 onLeave={() => handleLeaveHub(hub.id)}
                 onPreview={handleOpenPreview}
+                onSellEarn={() => setUnboxModal({ hubId: hub.id, hubName: hub.name })}
                />
              ))}
           </div>
@@ -250,6 +255,15 @@ export default function HubsPage() {
         )}
       </main>
 
+      {unboxModal && (
+        <UnboxSubmitModal
+          hubId={unboxModal.hubId}
+          hubName={unboxModal.hubName}
+          onClose={() => setUnboxModal(null)}
+          onSuccess={() => { setUnboxModal(null); fetchData() }}
+        />
+      )}
+
       {/* Media Preview Modal */}
       <MediaCarouselModal 
         isVisible={showPreview}
@@ -261,7 +275,8 @@ export default function HubsPage() {
   )
 }
 
-function HubCard({ hub, onJoin, onLeave, isProcessing, unboxedItems, onPreview }: { hub: any, onJoin: () => void, onLeave: () => void, isProcessing: boolean, unboxedItems: any[], onPreview: (item: any) => void }) {
+function HubCard({ hub, userId, onJoin, onLeave, isProcessing, unboxedItems, onPreview, onSellEarn }: { hub: any, userId: string | undefined, onJoin: () => void, onLeave: () => void, isProcessing: boolean, unboxedItems: any[], onPreview: (item: any) => void, onSellEarn: () => void }) {
+  const isOwner = userId && hub.owner_id && hub.owner_id === userId
   return (
     <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm hover:shadow-xl hover:border-brand/30 transition-all group flex flex-col h-full relative overflow-hidden">
        <div className="absolute top-0 right-0 w-32 h-32 bg-brand/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-brand/10 transition-colors" />
@@ -333,7 +348,16 @@ function HubCard({ hub, onJoin, onLeave, isProcessing, unboxedItems, onPreview }
        )}
 
        <div className="mt-auto pt-6 border-t border-gray-50 flex items-center justify-between relative z-10">
-          {hub.is_joined ? (
+          {isOwner ? (
+             <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-brand/10 text-brand rounded-xl text-[10px] font-black uppercase tracking-widest">
+                   <ShieldCheck size={14} /> Your Hub
+                </div>
+                <button onClick={onSellEarn} className="flex items-center gap-2 px-4 py-2.5 bg-brand text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand/90 shadow-lg shadow-brand/20 transition-all">
+                   <Coins size={14} /> Sell &amp; Earn
+                </button>
+             </div>
+          ) : hub.is_joined ? (
              <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest">
                 <UserCheck size={14} /> Joined
              </div>
@@ -343,19 +367,21 @@ function HubCard({ hub, onJoin, onLeave, isProcessing, unboxedItems, onPreview }
              </div>
           )}
           
-          <button 
-            onClick={hub.is_joined ? onLeave : onJoin}
-            disabled={isProcessing}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 ${
-              hub.is_joined 
-              ? 'bg-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-600' 
-              : 'bg-brand text-white hover:bg-brand/90 shadow-brand/20'
-            }`}
-          >
-             {isProcessing ? <Loader2 className="animate-spin" size={14} /> : (
-               hub.is_joined ? <><LogOut size={14} /> LEAVE</> : <><Plus size={14} /> JOIN HUB</>
-             )}
-          </button>
+          {!isOwner && (
+            <button 
+              onClick={hub.is_joined ? onLeave : onJoin}
+              disabled={isProcessing}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 ${
+                hub.is_joined 
+                ? 'bg-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-600' 
+                : 'bg-brand text-white hover:bg-brand/90 shadow-brand/20'
+              }`}
+            >
+               {isProcessing ? <Loader2 className="animate-spin" size={14} /> : (
+                 hub.is_joined ? <><LogOut size={14} /> LEAVE</> : <><Plus size={14} /> JOIN HUB</>
+               )}
+            </button>
+          )}
        </div>
     </div>
   )
