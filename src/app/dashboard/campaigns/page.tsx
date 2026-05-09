@@ -491,7 +491,7 @@ function StatusViewerModal({ statuses, initialIndex, onClose, user, onRewardedUp
 
     rewardTimeoutRef.current = setTimeout(() => {
       handleReward()
-    }, 50)
+    }, 4000)
 
     return () => {
       if (rewardTimeoutRef.current) {
@@ -506,7 +506,7 @@ function StatusViewerModal({ statuses, initialIndex, onClose, user, onRewardedUp
     setProgress(0)
     setIsRewarded(false)
     
-    const duration = 5000 
+    const duration = 8000 
     const interval = 50
     let elapsed = 0
 
