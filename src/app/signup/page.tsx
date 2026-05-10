@@ -114,8 +114,52 @@ function SignUpPageContent() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">
-      <div className="max-w-md w-full space-y-8 glass-card p-10 rounded-2xl">
+    <div className="min-h-screen flex flex-col lg:flex-row">
+      {/* Left: Hero Panel */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gray-900 relative overflow-hidden flex-col justify-between p-16">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-brand/40 via-transparent to-transparent" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-brand/20 rounded-full blur-3xl -ml-32 -mb-32" />
+        <div className="relative z-10">
+          <div className="h-12 w-12 overflow-hidden rounded-2xl mb-12">
+            <img src="/logo.png" alt="Brandible" className="h-full w-full object-contain" />
+          </div>
+          <p className="text-brand font-black text-xs uppercase tracking-[0.3em] mb-4">Brandible Influencer</p>
+          <h1 className="text-5xl font-black text-white leading-tight">
+            Your audience<br />is your<br /><span className="text-brand">superpower.</span>
+          </h1>
+          <p className="text-white/50 mt-6 text-lg leading-relaxed max-w-sm">
+            Create your free account and start earning coins from brands that want to reach your community.
+          </p>
+        </div>
+        <div className="relative z-10 space-y-6">
+          {[
+            { icon: '\ud83e\ude99', title: 'Earn Brandible Coins', desc: 'Get rewarded for every view, survey, and challenge you complete.' },
+            { icon: '\ud83d\udecd\ufe0f', title: 'Shop with your coins', desc: 'Redeem coins for real products from top brands in the marketplace.' },
+            { icon: '\ud83c\udfc6', title: 'Go Pro & get hired', desc: 'Build your reputation, get featured, and land private brand deals.' },
+            { icon: '\ud83e\udd1d', title: 'Lead a community', desc: 'Own a hub, grow your audience, and earn a cut of every campaign.' },
+          ].map((item) => (
+            <div key={item.title} className="flex items-start gap-4">
+              <div className="h-10 w-10 rounded-2xl bg-white/10 flex items-center justify-center text-lg flex-shrink-0">{item.icon}</div>
+              <div>
+                <p className="text-white font-bold text-sm">{item.title}</p>
+                <p className="text-white/40 text-xs mt-0.5">{item.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="relative z-10 pt-8 border-t border-white/10">
+          <p className="text-white/30 text-xs font-bold uppercase tracking-widest">&ldquo;The platform that pays you to be yourself.&rdquo;</p>
+        </div>
+      </div>
+
+      {/* Right: Form Panel */}
+      <div className="flex-1 flex items-center justify-center bg-gray-50 px-6 py-12 overflow-y-auto">
+        <div className="max-w-md w-full space-y-8">
+          <div className="lg:hidden flex justify-center mb-4">
+            <div className="h-14 w-14 overflow-hidden rounded-2xl">
+              <img src="/logo.png" alt="Brandible" className="h-full w-full object-contain" />
+            </div>
+          </div>
         <div className="text-center">
           <div className="mx-auto h-20 w-20 overflow-hidden rounded-2xl mb-4">
              <img src="/logo.png" alt="brandible" className="h-full w-full object-contain" />
@@ -278,9 +322,11 @@ function SignUpPageContent() {
             Sign in
           </Link>
         </p>
+        </div>
       </div>
     </div>
   )
+
 }
 
 export default function SignUpPage() {

@@ -110,7 +110,7 @@ export default function InfluencerProfilePage() {
             supabase.rpc('get_hubs_leaderboard')
           ])
           hubMembers = membersRes.count ?? null
-          const myHubStats = (leaderboardRes.data || []).find((h: any) => h.id === hubRes.data.id)
+          const myHubStats = (leaderboardRes.data || []).find((h: any) => h.id === hubRes.data?.id)
           successRate = myHubStats ? Number(myHubStats.member_success_rate) : null
         }
 
