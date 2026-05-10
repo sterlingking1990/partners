@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import {
   ShoppingBag, Search, Loader2, Play, X, ExternalLink,
-  MessageSquare, Sparkles, Tag, ChevronRight
+  MessageSquare, Sparkles, Tag, ChevronRight, Users
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Toast from '@/components/Toast'
@@ -45,9 +45,18 @@ export default function ShopPage() {
       ])
 
       if (mediaRes.error) throw mediaRes.error
-      setMediaItems(mediaRes.data || [])
-      setAllItems(mediaRes.data || [])
-      setMyHubIds((hubRes.data || []).map((h: any) => h.hub_id))
+      const hubIds = (hubRes.data || []).map((h: any) => h.hub_id)
+      setMyHubIds(hubIds)
+      // Sort hub-targeted items to top for members
+      const sorted = hubIds.length > 0
+        ? [...(mediaRes.data || [])].sort((a, b) => {
+            const aMatch = a.hub_ids?.some((hid: string) => hubIds.includes(hid)) ? 1 : 0
+            const bMatch = b.hub_ids?.some((hid: string) => hubIds.includes(hid)) ? 1 : 0
+            return bMatch - aMatch
+          })
+        : (mediaRes.data || [])
+      setMediaItems(sorted)
+      setAllItems(sorted)
     } catch (err) {
       console.error(err)
     } finally {
@@ -246,8 +255,18 @@ export default function ShopPage() {
               <div
                 key={item.id}
                 onClick={() => setSelectedItem(item)}
-                className="break-inside-avoid bg-white rounded-[1.5rem] overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:border-brand/20 transition-all cursor-pointer group"
+                className={`break-inside-avoid bg-white rounded-[1.5rem] overflow-hidden border shadow-sm hover:shadow-xl transition-all cursor-pointer group ${
+                  item.hub_ids?.some((hid: string) => myHubIds.includes(hid))
+                    ? 'border-brand/30 ring-1 ring-brand/20'
+                    : 'border-gray-100 hover:border-brand/20'
+                }`}
               >
+                {item.hub_ids?.some((hid: string) => myHubIds.includes(hid)) && (
+                  <div className="flex items-center gap-1 px-3 py-1.5 bg-brand text-white text-[9px] font-black uppercase tracking-widest">
+                    <Users size={10} />
+                    For Your Community
+                  </div>
+                )}
                 <div className="relative overflow-hidden">
                   {item.media_type === 'video' ? (
                     <div className="relative bg-gray-900">
