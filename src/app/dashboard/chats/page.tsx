@@ -33,6 +33,7 @@ import MediaCarouselModal from '@/components/MediaCarouselModal'
 function ChatMessagesContent() {
   const [chats, setChats] = useState<any[]>([])
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>('list')
   const [messages, setMessages] = useState<any[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(true)
@@ -159,8 +160,10 @@ function ChatMessagesContent() {
       const urlChatId = searchParams.get('id')
       if (urlChatId) {
         setSelectedChatId(urlChatId)
+        setMobileView('chat')
       } else if (enrichedChats.length > 0) {
         setSelectedChatId(enrichedChats[0].id)
+        // Don't switch to chat view on mobile for auto-selection
       }
 
     } catch (err) {
@@ -256,7 +259,7 @@ function ChatMessagesContent() {
   return (
     <div className="flex flex-1 h-[100vh] max-h-screen overflow-hidden bg-white">
       {/* Sidebar: Chat List */}
-      <div className="w-full md:w-[350px] lg:w-[400px] flex flex-col border-r border-gray-100 h-full bg-white relative z-10">
+      <div className={`${mobileView === 'chat' ? 'hidden' : 'flex'} md:flex w-full md:w-[350px] lg:w-[400px] flex-col border-r border-gray-100 h-full bg-white relative z-10`}>
         <header className="p-6 border-b border-gray-100 space-y-4 shrink-0">
            <div className="flex items-center justify-between">
               <h1 className="text-2xl font-black text-gray-900 tracking-tight">Messages</h1>
@@ -280,7 +283,7 @@ function ChatMessagesContent() {
            {filteredChats.length > 0 ? filteredChats.map((chat) => (
              <button
                key={chat.id}
-               onClick={() => setSelectedChatId(chat.id)}
+               onClick={() => { setSelectedChatId(chat.id); setMobileView('chat') }}
                className={`w-full flex items-center gap-4 p-4 transition-all border-b border-gray-50/50 ${selectedChatId === chat.id ? 'bg-brand/5 border-l-4 border-l-brand' : 'hover:bg-gray-50 border-l-4 border-l-transparent'}`}
              >
                 <div className="relative shrink-0">
@@ -313,12 +316,13 @@ function ChatMessagesContent() {
       </div>
 
       {/* Main Chat Window */}
-      <div className="flex-1 flex flex-col h-full bg-gray-50 relative overflow-hidden">
+      <div className={`${mobileView === 'list' ? 'hidden' : 'flex'} md:flex flex-1 flex-col h-full bg-gray-50 relative overflow-hidden`}>
         {selectedChat ? (
           <>
             {/* Chat Header */}
             <header className="h-20 bg-white border-b border-gray-200 px-8 flex items-center justify-between shrink-0 relative z-10">
                <div className="flex items-center gap-4">
+                  <button onClick={() => setMobileView('list')} className="md:hidden p-2 -ml-2 text-gray-500 hover:text-brand transition-colors"><ChevronLeft size={22} /></button>
                   <div className="h-11 w-11 rounded-xl overflow-hidden border border-gray-100 bg-gray-100 shrink-0">
                      <img 
                         src={selectedChat.brand_profile?.avatar_url || `https://ui-avatars.com/api/?name=${selectedChat.brand_profile?.full_name}&background=random`} 
