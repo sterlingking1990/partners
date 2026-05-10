@@ -137,7 +137,7 @@ export default function Sidebar() {
           </button>
         </div>
 
-        <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+        <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto scrollbar-hide">
           {navItems.map((item) => (
             <Link
               key={item.href}

@@ -28,3 +28,11 @@ body {
     @apply bg-gradient-to-br from-brand to-brand-dark;
   }
 }
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
