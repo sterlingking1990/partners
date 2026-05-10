@@ -21,6 +21,9 @@ export default function ShopPage() {
   const [showToast, setShowToast] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
+  const [myHubIds, setMyHubIds] = useState<string[]>([])
+  const [filterByMyHubs, setFilterByMyHubs] = useState(false)
+  const [allItems, setAllItems] = useState<any[]>([])
 
   const supabase = createClient()
   const router = useRouter()
@@ -36,14 +39,15 @@ export default function ShopPage() {
       if (!authUser) return
       setUser(authUser)
 
-      const { data, error } = await supabase
-        .from('searchable_brand_media')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100)
+      const [mediaRes, hubRes] = await Promise.all([
+        supabase.from('searchable_brand_media').select('*').order('created_at', { ascending: false }).limit(100),
+        supabase.from('hub_members').select('hub_id').eq('profile_id', authUser.id)
+      ])
 
-      if (error) throw error
-      setMediaItems(data || [])
+      if (mediaRes.error) throw mediaRes.error
+      setMediaItems(mediaRes.data || [])
+      setAllItems(mediaRes.data || [])
+      setMyHubIds((hubRes.data || []).map((h: any) => h.hub_id))
     } catch (err) {
       console.error(err)
     } finally {
@@ -78,7 +82,8 @@ export default function ShopPage() {
   const handleClearSearch = () => {
     setSearchQuery('')
     setAiAnalysis(null)
-    fetchData()
+    setFilterByMyHubs(false)
+    setMediaItems(allItems)
   }
 
   const handleContactBrand = async (item: any) => {
@@ -188,6 +193,28 @@ export default function ShopPage() {
             AI Search
           </button>
         </div>
+
+        {/* Hub Filter Toggle */}
+        {myHubIds.length > 0 && (
+          <button
+            onClick={() => {
+              const next = !filterByMyHubs
+              setFilterByMyHubs(next)
+              setMediaItems(next
+                ? allItems.filter((item: any) => item.hub_ids?.some((hid: string) => myHubIds.includes(hid)))
+                : allItems
+              )
+            }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest border transition-all ${
+              filterByMyHubs
+                ? 'bg-brand text-white border-brand shadow-lg shadow-brand/20'
+                : 'bg-white text-gray-500 border-gray-200 hover:border-brand/30 hover:text-brand'
+            }`}
+          >
+            <Tag size={14} />
+            {filterByMyHubs ? 'Showing My Communities' : 'Filter by My Communities'}
+          </button>
+        )}
 
         {/* AI Analysis */}
         {aiAnalysis && (

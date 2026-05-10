@@ -59,6 +59,8 @@ export default function InfluencerProfilePage() {
   const [stats, setStats] = useState({ participations: 0, hubMembers: null as number | null, successRate: null as number | null, affiliateEarned: 0 })
   const [isCreatingHub, setIsCreatingHub] = useState(false)
   const [isApplyingHub, setIsApplyingHub] = useState(false)
+  const [isEditingHub, setIsEditingHub] = useState(false)
+  const [hubEditData, setHubEditData] = useState({ name: '', description: '', wall_posting_fee: '' })
   const [hubFormData, setHubFormData] = useState({ name: '', description: '' })
   const [applyFormData, setApplyFormData] = useState({ community_name: '', platform: 'WhatsApp', group_link: '', member_count: '', niche: '' })
   
@@ -89,7 +91,7 @@ export default function InfluencerProfilePage() {
       // Fetch hub data
       if (profileData) {
         const [hubRes, appRes, challengeRes, surveyRes, statusRes, unboxRes] = await Promise.all([
-          supabase.from('hubs').select('id, name, description, invite_code').eq('owner_id', user.id).maybeSingle(),
+          supabase.from('hubs').select('id, name, description, invite_code, wall_posting_fee').eq('owner_id', user.id).maybeSingle(),
           supabase.from('hub_applications').select('*').eq('profile_id', user.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
           supabase.from('challenge_submissions').select('id', { count: 'exact', head: true }).eq('participant_id', user.id),
           supabase.from('survey_responses').select('id', { count: 'exact', head: true }).eq('respondent_id', user.id),
@@ -464,19 +466,61 @@ export default function InfluencerProfilePage() {
                         </div>
                       ) : hub ? (
                         <div className="space-y-3">
-                          <div>
-                            <p className="font-bold text-gray-900">{hub.name}</p>
-                            <p className="text-xs text-gray-500 mt-0.5">{hub.description}</p>
-                          </div>
-                          <div className="flex items-center gap-2 p-3 bg-brand/5 border border-brand/10 rounded-xl">
-                            <span className="font-black text-brand text-lg tracking-widest flex-1">{hub.invite_code}</span>
-                            <button onClick={() => { navigator.clipboard.writeText(hub.invite_code); setToastMessage('Code copied!'); setShowToast(true) }} className="p-2 hover:bg-brand/10 rounded-lg transition-colors">
-                              <Copy size={16} className="text-brand" />
-                            </button>
-                            <button onClick={() => navigator.share?.({ text: `Join my "${hub.name}" community on Brandible with code ${hub.invite_code}!` })} className="p-2 hover:bg-brand/10 rounded-lg transition-colors">
-                              <Share2 size={16} className="text-brand" />
-                            </button>
-                          </div>
+                          {isEditingHub ? (
+                            <div className="space-y-3">
+                              <input value={hubEditData.name} onChange={e => setHubEditData({...hubEditData, name: e.target.value})} placeholder="Hub Name" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand" />
+                              <textarea value={hubEditData.description} onChange={e => setHubEditData({...hubEditData, description: e.target.value})} placeholder="Description" rows={3} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand" />
+                              <div className="space-y-1">
+                                <input value={hubEditData.wall_posting_fee} onChange={e => setHubEditData({...hubEditData, wall_posting_fee: e.target.value})} placeholder="Wall posting fee (coins)" type="number" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand" />
+                                <p className="text-[10px] text-gray-400 px-1">You earn 80% each time a brand targets your hub on their wall post.</p>
+                              </div>
+                              <div className="flex gap-2">
+                                <button onClick={() => setIsEditingHub(false)} className="flex-1 py-3 border border-gray-200 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-50">Cancel</button>
+                                <button disabled={updating} onClick={async () => {
+                                  if (!hubEditData.name.trim()) { alert('Hub name is required'); return }
+                                  setUpdating(true)
+                                  try {
+                                    const { error } = await supabase.from('hubs').update({
+                                      name: hubEditData.name.trim(),
+                                      description: hubEditData.description.trim(),
+                                      wall_posting_fee: parseFloat(hubEditData.wall_posting_fee) || 0,
+                                    }).eq('id', hub.id)
+                                    if (error) throw error
+                                    setHub({ ...hub, name: hubEditData.name.trim(), description: hubEditData.description.trim(), wall_posting_fee: parseFloat(hubEditData.wall_posting_fee) || 0 })
+                                    setIsEditingHub(false)
+                                    setToastMessage('Hub updated!'); setShowToast(true)
+                                  } catch (e: any) { alert(e.message) }
+                                  finally { setUpdating(false) }
+                                }} className="flex-[2] py-3 bg-brand text-white rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-50 flex items-center justify-center gap-2">
+                                  {updating ? <Loader2 size={14} className="animate-spin" /> : 'Save Changes'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <p className="font-bold text-gray-900">{hub.name}</p>
+                                  <p className="text-xs text-gray-500 mt-0.5">{hub.description}</p>
+                                  {hub.wall_posting_fee > 0 && (
+                                    <p className="text-[10px] text-brand font-bold mt-1">{hub.wall_posting_fee} coins wall posting fee · you earn 80%</p>
+                                  )}
+                                </div>
+                                <button onClick={() => { setHubEditData({ name: hub.name, description: hub.description || '', wall_posting_fee: String(hub.wall_posting_fee || '') }); setIsEditingHub(true) }} className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-400 hover:text-brand">
+                                  <Edit3 size={16} />
+                                </button>
+                              </div>
+                              <div className="flex items-center gap-2 p-3 bg-brand/5 border border-brand/10 rounded-xl">
+                                <span className="font-black text-brand text-lg tracking-widest flex-1">{hub.invite_code}</span>
+                                <button onClick={() => { navigator.clipboard.writeText(hub.invite_code); setToastMessage('Code copied!'); setShowToast(true) }} className="p-2 hover:bg-brand/10 rounded-lg transition-colors">
+                                  <Copy size={16} className="text-brand" />
+                                </button>
+                                <button onClick={() => navigator.share?.({ text: `Join my "${hub.name}" community on Brandible with code ${hub.invite_code}!` })} className="p-2 hover:bg-brand/10 rounded-lg transition-colors">
+                                  <Share2 size={16} className="text-brand" />
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       ) : profile?.can_create_hub ? (
                         <div className="text-center py-4 space-y-3">
