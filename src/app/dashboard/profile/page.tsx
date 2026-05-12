@@ -31,7 +31,8 @@ import {
   Hash,
   Plus,
   Copy,
-  Share2
+  Share2,
+  Download
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Toast from '@/components/Toast'
@@ -61,6 +62,7 @@ export default function InfluencerProfilePage() {
   const [isApplyingHub, setIsApplyingHub] = useState(false)
   const [isEditingHub, setIsEditingHub] = useState(false)
   const [hubEditData, setHubEditData] = useState({ name: '', description: '', wall_posting_fee: '' })
+  const [generatingFlier, setGeneratingFlier] = useState(false)
   const [hubFormData, setHubFormData] = useState({ name: '', description: '' })
   const [applyFormData, setApplyFormData] = useState({ community_name: '', platform: 'WhatsApp', group_link: '', member_count: '', niche: '' })
   
@@ -519,6 +521,41 @@ export default function InfluencerProfilePage() {
                                   <Share2 size={16} className="text-brand" />
                                 </button>
                               </div>
+                              <button
+                                disabled={generatingFlier}
+                                onClick={async () => {
+                                  setGeneratingFlier(true)
+                                  try {
+                                    const { data, error } = await supabase.functions.invoke('generate-hub-flier', { body: { hub_id: hub.id } })
+                                    if (error) throw error
+                                    if (data.success) {
+                                      // Convert SVG to PNG in browser then download
+                                      const img = new Image()
+                                      img.crossOrigin = 'anonymous'
+                                      img.onload = () => {
+                                        const canvas = document.createElement('canvas')
+                                        canvas.width = 800
+                                        canvas.height = 1000
+                                        canvas.getContext('2d')!.drawImage(img, 0, 0)
+                                        const a = document.createElement('a')
+                                        a.href = canvas.toDataURL('image/png')
+                                        a.download = `${hub.name.replace(/\s+/g, '_')}_hub_flier.png`
+                                        a.click()
+                                      }
+                                      img.onerror = () => {
+                                        // Fallback: open SVG directly if canvas conversion fails
+                                        window.open(data.flier_url, '_blank')
+                                      }
+                                      img.src = data.flier_url
+                                    }
+                                  } catch (e: any) { alert(e.message) }
+                                  finally { setGeneratingFlier(false) }
+                                }}
+                                className="w-full mt-2 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors"
+                              >
+                                {generatingFlier ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                                {generatingFlier ? 'Generating...' : hub.flier_url ? 'View Marketing Flier' : 'Generate Marketing Flier'}
+                              </button>
                             </>
                           )}
                         </div>
