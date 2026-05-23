@@ -32,7 +32,8 @@ import {
   Plus,
   Copy,
   Share2,
-  Download
+  Download,
+  RefreshCw
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Toast from '@/components/Toast'
@@ -330,7 +331,7 @@ export default function InfluencerProfilePage() {
                     <h2 className="text-3xl font-black text-gray-900">{profile?.full_name || 'Your Name'}</h2>
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-brand/10 text-brand rounded-full text-[10px] font-black uppercase tracking-widest self-center md:self-auto">
                        <Award size={14} />
-                       Influencer
+                       Member
                     </div>
                  </div>
                  <p className="text-gray-500 font-bold tracking-wide">@{profile?.username}</p>
@@ -456,7 +457,7 @@ export default function InfluencerProfilePage() {
 
                       {isCreatingHub ? (
                         <div className="space-y-3">
-                          <p className="text-xs text-gray-500">Create a hub to invite your followers and earn 10% from their rewards!</p>
+                          <p className="text-xs text-gray-500">Create a hub, grow your buying community, and earn commission every time a brand pays to target your members.</p>
                           <input value={hubFormData.name} onChange={e => setHubFormData({...hubFormData, name: e.target.value})} placeholder="Hub Name (e.g. Lagos Techies)" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand" />
                           <textarea value={hubFormData.description} onChange={e => setHubFormData({...hubFormData, description: e.target.value})} placeholder="What interests and values define your community?" rows={3} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand" />
                           <div className="flex gap-2">
@@ -488,6 +489,11 @@ export default function InfluencerProfilePage() {
                                       wall_posting_fee: parseFloat(hubEditData.wall_posting_fee) || 0,
                                     }).eq('id', hub.id)
                                     if (error) throw error
+                                    if (hubEditData.description.trim() !== hub.description) {
+                                      supabase.functions.invoke('generate-hub-keywords', {
+                                        body: { hub_id: hub.id, description: hubEditData.description.trim() }
+                                      }).catch(() => {})
+                                    }
                                     setHub({ ...hub, name: hubEditData.name.trim(), description: hubEditData.description.trim(), wall_posting_fee: parseFloat(hubEditData.wall_posting_fee) || 0 })
                                     setIsEditingHub(false)
                                     setToastMessage('Hub updated!'); setShowToast(true)
@@ -517,45 +523,64 @@ export default function InfluencerProfilePage() {
                                 <button onClick={() => { navigator.clipboard.writeText(hub.invite_code); setToastMessage('Code copied!'); setShowToast(true) }} className="p-2 hover:bg-brand/10 rounded-lg transition-colors">
                                   <Copy size={16} className="text-brand" />
                                 </button>
-                                <button onClick={() => navigator.share?.({ text: `Join my "${hub.name}" community on Brandible with code ${hub.invite_code}!` })} className="p-2 hover:bg-brand/10 rounded-lg transition-colors">
+                                <button onClick={() => navigator.share?.({ text: `Join the "${hub.name}" community on Brandible! 🛍️\n\nWe shop brands we love, earn coins through brand activities, and get rewarded just for being part of the community.\n\nSign up at brandible.app and enter code ${hub.invite_code} to join our hub.` })} className="p-2 hover:bg-brand/10 rounded-lg transition-colors">
                                   <Share2 size={16} className="text-brand" />
                                 </button>
                               </div>
-                              <button
-                                disabled={generatingFlier}
-                                onClick={async () => {
-                                  setGeneratingFlier(true)
-                                  try {
-                                    const { data, error } = await supabase.functions.invoke('generate-hub-flier', { body: { hub_id: hub.id } })
-                                    if (error) throw error
-                                    if (data.success) {
-                                      // Convert SVG to PNG in browser then download
-                                      const img = new Image()
-                                      img.crossOrigin = 'anonymous'
-                                      img.onload = () => {
-                                        const canvas = document.createElement('canvas')
-                                        canvas.width = 800
-                                        canvas.height = 1000
-                                        canvas.getContext('2d')!.drawImage(img, 0, 0)
-                                        const a = document.createElement('a')
-                                        a.href = canvas.toDataURL('image/png')
-                                        a.download = `${hub.name.replace(/\s+/g, '_')}_hub_flier.png`
-                                        a.click()
+                              <div className="flex gap-2 mt-2">
+                                <button
+                                  disabled={generatingFlier}
+                                  onClick={async () => {
+                                    setGeneratingFlier(true)
+                                    try {
+                                      const { data, error } = await supabase.functions.invoke('generate-hub-flier', { body: { hub_id: hub.id } })
+                                      if (error) throw error
+                                      if (data.success) {
+                                        const img = new Image()
+                                        img.crossOrigin = 'anonymous'
+                                        img.onload = () => {
+                                          const canvas = document.createElement('canvas')
+                                          canvas.width = 800
+                                          canvas.height = 1000
+                                          canvas.getContext('2d')!.drawImage(img, 0, 0)
+                                          const a = document.createElement('a')
+                                          a.href = canvas.toDataURL('image/png')
+                                          a.download = `${hub.name.replace(/\s+/g, '_')}_hub_flier.png`
+                                          a.click()
+                                        }
+                                        img.onerror = () => { window.open(data.flier_url, '_blank') }
+                                        img.src = data.flier_url
                                       }
-                                      img.onerror = () => {
-                                        // Fallback: open SVG directly if canvas conversion fails
-                                        window.open(data.flier_url, '_blank')
-                                      }
-                                      img.src = data.flier_url
-                                    }
-                                  } catch (e: any) { alert(e.message) }
-                                  finally { setGeneratingFlier(false) }
-                                }}
-                                className="w-full mt-2 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors"
-                              >
-                                {generatingFlier ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                                {generatingFlier ? 'Generating...' : hub.flier_url ? 'View Marketing Flier' : 'Generate Marketing Flier'}
-                              </button>
+                                    } catch (e: any) { alert(e.message) }
+                                    finally { setGeneratingFlier(false) }
+                                  }}
+                                  className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors"
+                                >
+                                  {generatingFlier ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                                  {generatingFlier ? 'Generating...' : hub.flier_url ? 'Download Flier' : 'Generate Flier'}
+                                </button>
+                                {hub.flier_url && (
+                                  <button
+                                    disabled={generatingFlier}
+                                    onClick={async () => {
+                                      setGeneratingFlier(true)
+                                      try {
+                                        const { data, error } = await supabase.functions.invoke('generate-hub-flier', { body: { hub_id: hub.id, force_regenerate: true } })
+                                        if (error) throw error
+                                        if (data.success) {
+                                          setHub({ ...hub, flier_url: data.flier_url })
+                                          setToastMessage('Flier regenerated!'); setShowToast(true)
+                                        }
+                                      } catch (e: any) { alert(e.message) }
+                                      finally { setGeneratingFlier(false) }
+                                    }}
+                                    title="Regenerate flier"
+                                    className="px-3 py-2.5 bg-gray-100 text-gray-500 rounded-xl text-xs font-black disabled:opacity-50 flex items-center justify-center hover:bg-gray-200 transition-colors"
+                                  >
+                                    <RefreshCw size={14} />
+                                  </button>
+                                )}
+                              </div>
                             </>
                           )}
                         </div>
@@ -572,7 +597,7 @@ export default function InfluencerProfilePage() {
                         </div>
                       ) : isApplyingHub ? (
                         <div className="space-y-3">
-                          <p className="text-xs text-gray-500">Tell us about your community to get verified as a hub owner.</p>
+                          <p className="text-xs text-gray-500">Tell us about your community. Once verified, brands can target your hub with campaigns and you earn commission every time they do.</p>
                           <input value={applyFormData.community_name} onChange={e => setApplyFormData({...applyFormData, community_name: e.target.value})} placeholder="Community Name" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand" />
                           <select value={applyFormData.platform} onChange={e => setApplyFormData({...applyFormData, platform: e.target.value})} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none">
                             <option>WhatsApp</option><option>Telegram</option><option>Facebook</option><option>Other</option>
@@ -590,7 +615,7 @@ export default function InfluencerProfilePage() {
                       ) : (
                         <div className="text-center py-4 space-y-3">
                           <Users size={40} className="mx-auto text-gray-300" />
-                          <p className="text-xs text-gray-500">Apply to become a verified hub owner and earn from your community.</p>
+                          <p className="text-xs text-gray-500">Apply to become a verified hub owner. Brands pay to target your community members — and you earn commission every time they do.</p>
                           <button onClick={() => setIsApplyingHub(true)} className="px-6 py-3 bg-gray-900 text-white rounded-xl text-xs font-black uppercase tracking-widest">Apply to Create a Hub</button>
                         </div>
                       )}
@@ -619,7 +644,7 @@ export default function InfluencerProfilePage() {
                        <Star className="fill-white" size={24} />
                     </div>
                     <div>
-                       <h3 className="text-xl font-bold">Influencer Stats</h3>
+                       <h3 className="text-xl font-bold">Member Stats</h3>
                        <p className="text-white/40 text-[10px] font-black uppercase tracking-widest mt-1">Growth Metrics</p>
                     </div>
                     <div className="space-y-4 pt-4">

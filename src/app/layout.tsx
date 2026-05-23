@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Brandible | Influencer Portal",
+  title: "Brandible | Member Portal",
   description: "Manage your earnings and participate in brand campaigns",
 };
 

@@ -301,7 +301,7 @@ function HubCard({ hub, userId, onJoin, onLeave, isProcessing, unboxedItems, onP
        </div>
 
        <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed mb-6 relative z-10">
-         {hub.description || "A vibrant community of creative influencers collaborating and growing together."}
+         {hub.description || "A vibrant community of buyers collaborating and growing together."}
        </p>
 
        {/* Hub Metrics */}

@@ -70,7 +70,7 @@ export default async function InfluencerDashboardPage() {
     <>
       {/* Header */}
       <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 sticky top-0 z-10">
-        <h1 className="text-lg font-semibold text-gray-800">Influencer Overview</h1>
+        <h1 className="text-lg font-semibold text-gray-800">Member Overview</h1>
         
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2 bg-brand/10 px-3 py-1.5 rounded-full border border-brand/10">

@@ -181,7 +181,7 @@ export default function CampaignCenterPage() {
       const url = new URL(generatedLink)
       const code = url.searchParams.get('redeem_code')
 
-      const shareText = `🔥 Check this out on Brandible! Use my code [${code}] in your Influencer App to earn ${Math.round((campaign.reward_amount || 0) * 0.9)} BC instantly. Link: ${generatedLink}`
+      const shareText = `🔥 Check this out on Brandible! Use my code [${code}] in your Member App to earn ${Math.round((campaign.reward_amount || 0) * 0.9)} BC instantly. Link: ${generatedLink}`
 
       if (navigator.share) {
         await navigator.share({

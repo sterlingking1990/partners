@@ -245,7 +245,7 @@ export default function MediaCarouselModal({
                  </button>
                )}
                <p className="text-[10px] text-white/30 text-center font-bold uppercase tracking-widest">
-                  * Support this influencer by buying through their review
+                  * Support this member by buying through their review
                </p>
             </div>
          </div>

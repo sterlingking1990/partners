@@ -48,20 +48,20 @@ function LoginPageContent() {
           <div className="h-12 w-12 overflow-hidden rounded-2xl mb-12">
             <img src="/logo.png" alt="Brandible" className="h-full w-full object-contain" />
           </div>
-          <p className="text-brand font-black text-xs uppercase tracking-[0.3em] mb-4">Brandible Influencer</p>
-          <h1 className="text-5xl font-black text-white leading-tight">
-            Turn your<br />influence into<br /><span className="text-brand">real income.</span>
+          <p className="text-brand font-black text-xs uppercase tracking-[0.3em] mb-6">Brandible Member</p>
+          <h1 className="text-5xl font-black text-white leading-[1.1]">
+            Shop brands you love<br /><span className="text-brand">&mdash; get rewarded.</span>
           </h1>
-          <p className="text-white/50 mt-6 text-lg leading-relaxed max-w-sm">
-            Join thousands of creators earning coins by viewing content, completing challenges, and representing brands they love.
+          <p className="text-white/50 mt-8 text-base leading-relaxed max-w-sm">
+            Brandible is a buying community. Discover products from brands you love, earn coins through their activities, and spend them on more of what you want.
           </p>
         </div>
         <div className="relative z-10 space-y-6">
           {[
-            { icon: '\ud83e\ude99', title: 'Earn Brandible Coins', desc: 'Get rewarded for every view, survey, and challenge you complete.' },
-            { icon: '\ud83d\udecd\ufe0f', title: 'Shop with your coins', desc: 'Redeem coins for real products from top brands in the marketplace.' },
-            { icon: '\ud83c\udfc6', title: 'Go Pro & get hired', desc: 'Build your reputation, get featured, and land private brand deals.' },
-            { icon: '\ud83e\udd1d', title: 'Lead a community', desc: 'Own a hub, grow your audience, and earn a cut of every campaign.' },
+            { icon: '\ud83d\udecd\ufe0f', title: 'Buy from brands you love', desc: 'Discover products from real brands inside your hub and buy directly.' },
+            { icon: '\ud83e\ude99', title: 'Earn while you engage', desc: 'Complete status views, surveys, challenges, and games to earn Brandible Coins.' },
+            { icon: '\ud83c\udfaf', title: 'Join the right community', desc: 'Hubs connect you to brands that actually match what you care about.' },
+            { icon: '\ud83c\udfc6', title: 'Own a hub, earn commission', desc: 'Build a hub community and earn a fee every time a brand targets your members.' },
           ].map((item) => (
             <div key={item.title} className="flex items-start gap-4">
               <div className="h-10 w-10 rounded-2xl bg-white/10 flex items-center justify-center text-lg flex-shrink-0">{item.icon}</div>
@@ -73,21 +73,57 @@ function LoginPageContent() {
           ))}
         </div>
         <div className="relative z-10 pt-8 border-t border-white/10">
-          <p className="text-white/30 text-xs font-bold uppercase tracking-widest">&ldquo;The platform that pays you to be yourself.&rdquo;</p>
+          <p className="text-white/30 text-xs font-bold uppercase tracking-widest">&ldquo;Where buyers and brands build something real.&rdquo;</p>
+        </div>
+      </div>
+
+      {/* Mobile Hero — visible only on small screens */}
+      <div className="lg:hidden bg-gray-900 relative overflow-hidden px-8 pt-12 pb-10">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-brand/40 via-transparent to-transparent" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-brand/20 rounded-full blur-3xl -ml-20 -mb-20" />
+        <div className="relative z-10">
+          {/* Logo + label */}
+          <div className="flex items-center gap-3 mb-8">
+            <div className="h-10 w-10 overflow-hidden rounded-xl flex-shrink-0">
+              <img src="/logo.png" alt="Brandible" className="h-full w-full object-contain" />
+            </div>
+            <p className="text-brand font-black text-xs uppercase tracking-[0.25em]">Brandible Member</p>
+          </div>
+
+          {/* Headline */}
+          <h1 className="text-3xl font-black text-white leading-[1.15] mb-4">
+            Shop brands you love<br />
+            <span className="text-brand">&mdash; and get rewarded.</span>
+          </h1>
+
+          {/* Description */}
+          <p className="text-white/50 text-sm leading-relaxed mb-8">
+            Brandible is a buying community. Discover products, engage with brand activities, and earn coins — all inside your hub.
+          </p>
+
+          {/* Feature pills */}
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { icon: '🛍️', text: 'Shop brands you love' },
+              { icon: '🪙', text: 'Earn coins for activities' },
+              { icon: '🎯', text: 'Join the right hub' },
+              { icon: '🏆', text: 'Own a hub, earn commission' },
+            ].map((item) => (
+              <div key={item.text} className="flex items-center gap-2 bg-white/5 border border-white/5 rounded-xl px-3 py-3">
+                <span className="text-base flex-shrink-0">{item.icon}</span>
+                <p className="text-white/70 text-xs font-semibold leading-tight">{item.text}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Right: Form Panel */}
       <div className="flex-1 flex items-center justify-center bg-gray-50 px-6 py-12">
         <div className="max-w-md w-full space-y-8">
-          <div className="lg:hidden flex justify-center mb-4">
-            <div className="h-14 w-14 overflow-hidden rounded-2xl">
-              <img src="/logo.png" alt="Brandible" className="h-full w-full object-contain" />
-            </div>
-          </div>
           <div>
             <h2 className="text-3xl font-extrabold text-gray-900">Welcome back</h2>
-            <p className="mt-2 text-sm text-gray-500">Sign in to your influencer account</p>
+            <p className="mt-2 text-sm text-gray-500">Sign in to your member account</p>
           </div>
 
           <form className="space-y-6" onSubmit={handleLogin}>
@@ -142,7 +178,7 @@ function LoginPageContent() {
           </form>
 
           <p className="text-center text-sm text-gray-600">
-            New influencer?{' '}
+            New member?{' '}
             <Link
               href={redirect ? `/signup?redirect=${encodeURIComponent(redirect)}` : '/signup'}
               className="font-semibold text-brand hover:text-brand-dark transition-colors"
