@@ -2,24 +2,18 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { 
-  Settings, 
-  Bell, 
-  ShieldCheck, 
-  Lock, 
-  Eye, 
-  EyeOff, 
-  Loader2, 
-  CheckCircle2, 
+import {
+  Settings,
+  Bell,
+  ShieldCheck,
+  Lock,
+  Loader2,
+  CheckCircle2,
   X,
   Smartphone,
-  Mail,
-  ArrowLeft,
   ChevronRight,
   LogOut,
-  Zap,
   Globe,
-  UserCheck
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Toast from '@/components/Toast'
@@ -182,6 +176,20 @@ export default function SettingsPage() {
            </div>
         </section>
 
+        {/* Browser Notifications Section */}
+        <section className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm space-y-8">
+           <div className="flex items-center gap-3 border-b border-gray-50 pb-6">
+              <div className="h-10 w-10 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center">
+                 <Globe size={20} />
+              </div>
+              <div>
+                 <h3 className="text-lg font-bold text-gray-900">Browser Notifications</h3>
+                 <p className="text-xs text-gray-400 font-medium">Get alerts in this browser, even when the tab is in the background.</p>
+              </div>
+           </div>
+           <BrowserNotificationToggle supabase={supabase} />
+        </section>
+
         {/* Security Section */}
         <section className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm space-y-8">
            <div className="flex items-center gap-3 border-b border-gray-50 pb-6">
@@ -253,7 +261,7 @@ function ToggleItem({ label, desc, enabled, onToggle }: ToggleItemProps) {
           <p className="text-sm font-bold text-gray-900">{label}</p>
           <p className="text-xs text-gray-500 mt-1 leading-relaxed">{desc}</p>
        </div>
-       <button 
+       <button
          onClick={() => onToggle(!enabled)}
          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${enabled ? 'bg-brand' : 'bg-gray-200'}`}
        >
@@ -261,4 +269,169 @@ function ToggleItem({ label, desc, enabled, onToggle }: ToggleItemProps) {
        </button>
     </div>
   )
+}
+
+function BrowserNotificationToggle({ supabase }: { supabase: ReturnType<typeof import('@/utils/supabase/client').createClient> }) {
+  const [permission,   setPermission]   = useState<NotificationPermission | 'unsupported'>('default')
+  const [subscribing,  setSubscribing]  = useState(false)
+  const [subscribed,   setSubscribed]   = useState(false)
+
+  useEffect(() => {
+    if (typeof Notification === 'undefined') { setPermission('unsupported'); return }
+    setPermission(Notification.permission)
+    checkExistingSubscription()
+  }, [])
+
+  const checkExistingSubscription = async () => {
+    if (!('serviceWorker' in navigator)) return
+    const reg = await navigator.serviceWorker.ready.catch(() => null)
+    if (!reg) return
+    const sub = await reg.pushManager.getSubscription().catch(() => null)
+    setSubscribed(!!sub)
+  }
+
+  const handleEnable = async () => {
+    if (typeof Notification === 'undefined' || !('serviceWorker' in navigator)) return
+    setSubscribing(true)
+    try {
+      const perm = await Notification.requestPermission()
+      setPermission(perm)
+      if (perm !== 'granted') return
+
+      const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+      if (!vapidKey) {
+        // Tier 1 only: permission granted, Realtime will show foreground notifications
+        return
+      }
+
+      // Tier 2: register push subscription
+      const reg = await navigator.serviceWorker.ready
+      const existing = await reg.pushManager.getSubscription()
+      const sub = existing ?? await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey),
+      })
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { endpoint, keys } = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } }
+      await supabase.from('web_push_subscriptions').upsert(
+        { user_id: user.id, endpoint, p256dh: keys.p256dh, auth: keys.auth },
+        { onConflict: 'endpoint' }
+      )
+      setSubscribed(true)
+    } catch (err) {
+      console.error('Push subscription error:', err)
+    } finally {
+      setSubscribing(false)
+    }
+  }
+
+  const handleDisable = async () => {
+    if (!('serviceWorker' in navigator)) return
+    setSubscribing(true)
+    try {
+      const reg = await navigator.serviceWorker.ready.catch(() => null)
+      const sub = await reg?.pushManager.getSubscription().catch(() => null)
+      if (sub) {
+        const endpoint = sub.endpoint
+        await sub.unsubscribe()
+        await supabase.from('web_push_subscriptions').delete().eq('endpoint', endpoint)
+      }
+      setSubscribed(false)
+    } finally {
+      setSubscribing(false)
+    }
+  }
+
+  if (permission === 'unsupported') {
+    return (
+      <p className="text-sm text-gray-400 font-medium">
+        Browser notifications are not supported in this browser.
+      </p>
+    )
+  }
+
+  if (permission === 'denied') {
+    return (
+      <div className="flex items-start gap-3 p-4 bg-red-50 rounded-2xl">
+        <div className="h-8 w-8 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
+          <X size={16} className="text-red-600" />
+        </div>
+        <div>
+          <p className="text-sm font-bold text-red-700">Notifications Blocked</p>
+          <p className="text-xs text-red-500 mt-0.5 leading-relaxed">
+            You have blocked notifications for this site. To re-enable, open your browser's site settings and allow notifications for this domain.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (permission === 'granted' && subscribed) {
+    return (
+      <div className="flex items-center justify-between p-4 rounded-2xl border border-green-100 bg-green-50">
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-8 rounded-lg bg-green-100 flex items-center justify-center">
+            <CheckCircle2 size={16} className="text-green-600" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-green-800">Browser notifications enabled</p>
+            <p className="text-xs text-green-600 mt-0.5">You'll receive alerts even when this tab is in the background.</p>
+          </div>
+        </div>
+        <button
+          onClick={handleDisable}
+          disabled={subscribing}
+          className="text-xs font-bold text-red-500 hover:text-red-700 transition-colors disabled:opacity-50"
+        >
+          Disable
+        </button>
+      </div>
+    )
+  }
+
+  if (permission === 'granted' && !subscribed) {
+    return (
+      <div className="flex items-center justify-between p-4 rounded-2xl border border-brand/20 bg-brand/5">
+        <div>
+          <p className="text-sm font-bold text-gray-900">Permission granted</p>
+          <p className="text-xs text-gray-500 mt-0.5">You'll see foreground alerts. Enable push to get background notifications too.</p>
+        </div>
+        <button
+          onClick={handleEnable}
+          disabled={subscribing}
+          className="px-4 py-1.5 bg-brand text-white rounded-xl text-xs font-bold hover:bg-brand/90 transition-all disabled:opacity-50 flex items-center gap-1.5"
+        >
+          {subscribing && <Loader2 size={12} className="animate-spin" />}
+          Enable Push
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center justify-between p-4 rounded-2xl border border-gray-100">
+      <div>
+        <p className="text-sm font-bold text-gray-900">Enable browser notifications</p>
+        <p className="text-xs text-gray-500 mt-0.5">Get alerted for messages, approvals, and new campaigns.</p>
+      </div>
+      <button
+        onClick={handleEnable}
+        disabled={subscribing}
+        className="px-4 py-1.5 bg-brand text-white rounded-xl text-xs font-bold hover:bg-brand/90 transition-all disabled:opacity-50 flex items-center gap-1.5"
+      >
+        {subscribing && <Loader2 size={12} className="animate-spin" />}
+        Enable
+      </button>
+    </div>
+  )
+}
+
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const rawData = atob(base64)
+  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)))
 }
