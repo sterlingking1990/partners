@@ -591,9 +591,25 @@ export default function InfluencerProfilePage() {
                           <button onClick={() => setIsCreatingHub(true)} className="px-6 py-3 bg-brand text-white rounded-xl text-xs font-black uppercase tracking-widest">Create Your Hub Now</button>
                         </div>
                       ) : hubApplication ? (
-                        <div className={`p-4 rounded-2xl text-center space-y-1 ${hubApplication.status === 'approved' ? 'bg-emerald-50 border border-emerald-100' : hubApplication.status === 'rejected' ? 'bg-red-50 border border-red-100' : 'bg-gray-50 border border-gray-100'}`}>
+                        <div className={`p-4 rounded-2xl text-center space-y-2 ${hubApplication.status === 'approved' ? 'bg-emerald-50 border border-emerald-100' : hubApplication.status === 'rejected' ? 'bg-red-50 border border-red-100' : 'bg-gray-50 border border-gray-100'}`}>
                           <p className="font-black text-sm">{hubApplication.status === 'pending' ? '⏳ Application Pending' : hubApplication.status === 'approved' ? '✅ Application Approved!' : '❌ Application Rejected'}</p>
-                          <p className="text-xs text-gray-500">We will notify you once reviewed.</p>
+                          <p className="text-xs text-gray-500">
+                            {hubApplication.status === 'approved'
+                              ? "You're approved — create your hub now and start earning from brand campaigns."
+                              : hubApplication.status === 'rejected'
+                              ? hubApplication.admin_notes || 'Your application did not meet our community standards at this time.'
+                              : 'We are reviewing your community. This usually takes 24–48 hours.'}
+                          </p>
+                          {hubApplication.status === 'approved' && (
+                            <button onClick={() => setIsCreatingHub(true)} className="mt-2 px-6 py-3 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 transition-colors">
+                              Create Your Hub
+                            </button>
+                          )}
+                          {hubApplication.status === 'rejected' && (
+                            <button onClick={() => setIsApplyingHub(true)} className="mt-2 px-6 py-3 bg-red-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-700 transition-colors">
+                              Apply Again
+                            </button>
+                          )}
                         </div>
                       ) : isApplyingHub ? (
                         <div className="space-y-3">
