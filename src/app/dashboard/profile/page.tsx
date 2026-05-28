@@ -536,12 +536,13 @@ export default function InfluencerProfilePage() {
                                       const { data, error } = await supabase.functions.invoke('generate-hub-flier', { body: { hub_id: hub.id } })
                                       if (error) throw error
                                       if (data.success) {
+                                        setHub({ ...hub, flier_url: data.flier_url })
                                         const img = new Image()
                                         img.crossOrigin = 'anonymous'
                                         img.onload = () => {
                                           const canvas = document.createElement('canvas')
-                                          canvas.width = 800
-                                          canvas.height = 1000
+                                          canvas.width = img.naturalWidth
+                                          canvas.height = img.naturalHeight
                                           canvas.getContext('2d')!.drawImage(img, 0, 0)
                                           const a = document.createElement('a')
                                           a.href = canvas.toDataURL('image/png')
