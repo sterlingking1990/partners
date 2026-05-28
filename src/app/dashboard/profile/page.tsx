@@ -537,20 +537,18 @@ export default function InfluencerProfilePage() {
                                       if (error) throw error
                                       if (data.success) {
                                         setHub({ ...hub, flier_url: data.flier_url })
-                                        const img = new Image()
-                                        img.crossOrigin = 'anonymous'
-                                        img.onload = () => {
-                                          const canvas = document.createElement('canvas')
-                                          canvas.width = img.naturalWidth
-                                          canvas.height = img.naturalHeight
-                                          canvas.getContext('2d')!.drawImage(img, 0, 0)
+                                        try {
+                                          const res = await fetch(data.flier_url)
+                                          const blob = await res.blob()
+                                          const blobUrl = URL.createObjectURL(blob)
                                           const a = document.createElement('a')
-                                          a.href = canvas.toDataURL('image/png')
-                                          a.download = `${hub.name.replace(/\s+/g, '_')}_hub_flier.png`
+                                          a.href = blobUrl
+                                          a.download = `${hub.name.replace(/\s+/g, '_')}_hub_flier.svg`
                                           a.click()
+                                          URL.revokeObjectURL(blobUrl)
+                                        } catch {
+                                          window.open(data.flier_url, '_blank')
                                         }
-                                        img.onerror = () => { window.open(data.flier_url, '_blank') }
-                                        img.src = data.flier_url
                                       }
                                     } catch (e: any) { alert(e.message) }
                                     finally { setGeneratingFlier(false) }
