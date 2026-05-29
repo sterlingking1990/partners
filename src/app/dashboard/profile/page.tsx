@@ -533,12 +533,15 @@ export default function InfluencerProfilePage() {
                                   onClick={async () => {
                                     setGeneratingFlier(true)
                                     try {
-                                      const { data, error } = await supabase.functions.invoke('generate-hub-flier', { body: { hub_id: hub.id } })
-                                      if (error) throw error
-                                      if (data.success) {
-                                        setHub({ ...hub, flier_url: data.flier_url })
+                                      const urlToDownload = hub.flier_url || await (async () => {
+                                        const { data, error } = await supabase.functions.invoke('generate-hub-flier', { body: { hub_id: hub.id } })
+                                        if (error) throw error
+                                        if (data.success) { setHub({ ...hub, flier_url: data.flier_url }); return data.flier_url }
+                                        return null
+                                      })()
+                                      if (urlToDownload) {
                                         try {
-                                          const res = await fetch(data.flier_url)
+                                          const res = await fetch(urlToDownload)
                                           const blob = await res.blob()
                                           const blobUrl = URL.createObjectURL(blob)
                                           const a = document.createElement('a')
@@ -547,7 +550,7 @@ export default function InfluencerProfilePage() {
                                           a.click()
                                           URL.revokeObjectURL(blobUrl)
                                         } catch {
-                                          window.open(data.flier_url, '_blank')
+                                          window.open(urlToDownload, '_blank')
                                         }
                                       }
                                     } catch (e: any) { alert(e.message) }
@@ -556,29 +559,27 @@ export default function InfluencerProfilePage() {
                                   className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors"
                                 >
                                   {generatingFlier ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                                  {generatingFlier ? 'Generating...' : hub.flier_url ? 'Download Flier' : 'Generate Flier'}
+                                  {generatingFlier ? 'Generating...' : 'Download Flier'}
                                 </button>
-                                {hub.flier_url && (
-                                  <button
-                                    disabled={generatingFlier}
-                                    onClick={async () => {
-                                      setGeneratingFlier(true)
-                                      try {
-                                        const { data, error } = await supabase.functions.invoke('generate-hub-flier', { body: { hub_id: hub.id, force_regenerate: true } })
-                                        if (error) throw error
-                                        if (data.success) {
-                                          setHub({ ...hub, flier_url: data.flier_url })
-                                          setToastMessage('Flier regenerated!'); setShowToast(true)
-                                        }
-                                      } catch (e: any) { alert(e.message) }
-                                      finally { setGeneratingFlier(false) }
-                                    }}
-                                    title="Regenerate flier"
-                                    className="px-3 py-2.5 bg-gray-100 text-gray-500 rounded-xl text-xs font-black disabled:opacity-50 flex items-center justify-center hover:bg-gray-200 transition-colors"
-                                  >
-                                    <RefreshCw size={14} />
-                                  </button>
-                                )}
+                                <button
+                                  disabled={generatingFlier}
+                                  onClick={async () => {
+                                    setGeneratingFlier(true)
+                                    try {
+                                      const { data, error } = await supabase.functions.invoke('generate-hub-flier', { body: { hub_id: hub.id, force_regenerate: true } })
+                                      if (error) throw error
+                                      if (data.success) {
+                                        setHub({ ...hub, flier_url: data.flier_url })
+                                        setToastMessage('Flier regenerated! Download to get the new version.'); setShowToast(true)
+                                      }
+                                    } catch (e: any) { alert(e.message) }
+                                    finally { setGeneratingFlier(false) }
+                                  }}
+                                  title="Regenerate flier"
+                                  className="px-3 py-2.5 bg-gray-100 text-gray-500 rounded-xl text-xs font-black disabled:opacity-50 flex items-center justify-center hover:bg-gray-200 transition-colors"
+                                >
+                                  {generatingFlier ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                                </button>
                               </div>
                             </>
                           )}
