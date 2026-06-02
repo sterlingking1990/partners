@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import {
@@ -53,8 +53,8 @@ function FulfilmentDescription({ type, config }: { type: string; config: Record<
   }
 }
 
-export default function PublicActivationPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id: campaignId } = use(params)
+export default function PublicActivationPage({ params }: { params: { id: string } }) {
+  const { id: campaignId } = params
   const searchParams = useSearchParams()
   const referrerId = searchParams.get('ref')
   const supabase = createClient()
