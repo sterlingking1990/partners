@@ -14,6 +14,7 @@ import {
   LogOut,
   ShoppingBag,
   Zap,
+  Store,
   Menu,
   X,
   Bell,
@@ -24,6 +25,7 @@ import { useRouter } from 'next/navigation'
 const navItems = [
   { icon: <LayoutDashboard size={20} />, label: "Dashboard",  href: "/dashboard" },
   { icon: <Megaphone size={20} />,       label: "Campaigns",  href: "/dashboard/campaigns" },
+  { icon: <Store size={20} />,           label: "Activations",href: "/dashboard/activations" },
   { icon: <Zap size={20} />,             label: "Affiliate",  href: "/dashboard/affiliate" },
   { icon: <Globe size={20} />,           label: "Hubs",       href: "/dashboard/hubs" },
   { icon: <MessageSquare size={20} />,   label: "Messages",   href: "/dashboard/chats" },

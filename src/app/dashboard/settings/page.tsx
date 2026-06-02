@@ -14,6 +14,7 @@ import {
   ChevronRight,
   LogOut,
   Globe,
+  Phone,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Toast from '@/components/Toast'
@@ -27,8 +28,8 @@ interface NotificationPreferences {
 
 interface Profile {
   id: string
+  phone?: string | null
   notification_preferences?: NotificationPreferences
-  // Add other profile fields as needed
 }
 
 interface ToggleItemProps {
@@ -42,7 +43,9 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
-  
+  const [phone, setPhone] = useState('')
+  const [savingPhone, setSavingPhone] = useState(false)
+
   const [notifications, setNotificationPrefs] = useState<NotificationPreferences>({
     new_message: true,
     invite_accepted: true,
@@ -74,6 +77,7 @@ export default function SettingsPage() {
       
       if (data) {
         setProfile(data)
+        setPhone(data.phone ?? '')
         if (data.notification_preferences) {
           setNotificationPrefs(data.notification_preferences)
         }
@@ -100,6 +104,28 @@ export default function SettingsPage() {
       setShowToast(true)
     } catch (err: any) {
       alert(err.message)
+    }
+  }
+
+  const handleSavePhone = async () => {
+    if (!profile) return
+    const cleaned = phone.trim()
+    if (!cleaned) return
+    setSavingPhone(true)
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ phone: cleaned })
+        .eq('id', profile.id)
+      if (error) throw error
+      setProfile(p => p ? { ...p, phone: cleaned } : p)
+      setToastMessage('Phone number saved!')
+      setShowToast(true)
+    } catch (e: any) {
+      setToastMessage(`Error: ${e.message}`)
+      setShowToast(true)
+    } finally {
+      setSavingPhone(false)
     }
   }
 
@@ -229,6 +255,41 @@ export default function SettingsPage() {
                  <button className="px-4 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all">Enable</button>
               </div>
            </div>
+        </section>
+
+        {/* Phone Number Section */}
+        <section className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm space-y-6">
+          <div className="flex items-center gap-3 border-b border-gray-50 pb-6">
+            <div className="h-10 w-10 bg-green-50 text-green-600 rounded-xl flex items-center justify-center">
+              <Phone size={20} />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Phone Number</h3>
+              <p className="text-xs text-gray-400 font-medium">Required to receive your dedicated payment account for activation campaigns.</p>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <input
+              type="tel"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              placeholder="+2348012345678"
+              className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+            />
+            <button
+              onClick={handleSavePhone}
+              disabled={savingPhone || !phone.trim() || phone.trim() === (profile?.phone ?? '')}
+              className="flex items-center gap-2 px-5 py-3 bg-brand text-white rounded-xl text-sm font-bold hover:bg-brand/90 disabled:opacity-50 transition-colors"
+            >
+              {savingPhone ? <Loader2 size={14} className="animate-spin" /> : null}
+              Save
+            </button>
+          </div>
+          {!profile?.phone && (
+            <p className="text-xs text-amber-600 font-medium">
+              You must add a phone number before you can join activation campaigns and receive a dedicated payment account.
+            </p>
+          )}
         </section>
 
         {/* Support Section */}
