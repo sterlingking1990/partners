@@ -20,7 +20,10 @@ import Toast from '@/components/Toast'
 interface Bank {
   name: string
   code: string
+  type: string  // "nuban" | "mobile_money" | "opay" etc.
 }
+
+const MANUAL_NAME_TYPES = new Set(['mobile_money', 'opay', 'microfinance'])
 
 interface FormData {
   bank_name: string
@@ -29,6 +32,30 @@ interface FormData {
   account_name: string
 }
 
+// ---------------------------------------------------------------------------
+// Fuzzy name match — handles Nigerian name ordering and partial names.
+// Normalises both strings, splits into tokens, then requires that at least
+// 2 tokens overlap OR ≥60% of the shorter name's tokens appear in the other.
+// ---------------------------------------------------------------------------
+function nameTokens(name: string): string[] {
+  return name
+    .toUpperCase()
+    .replace(/[^A-Z\s]/g, '')
+    .split(/\s+/)
+    .filter(Boolean)
+}
+
+function nameMatchScore(a: string, b: string): number {
+  const ta = nameTokens(a)
+  const tb = nameTokens(b)
+  if (!ta.length || !tb.length) return 0
+  const setB = new Set(tb)
+  const matches = ta.filter(t => setB.has(t)).length
+  return matches / Math.min(ta.length, tb.length)
+}
+
+const NAME_MATCH_THRESHOLD = 0.6 // 60% of the shorter name's tokens must overlap
+
 export default function BankAccountsPage() {
   const [banks, setBanks] = useState<any[]>([])
   const [bankList, setBankList] = useState<Bank[]>([])
@@ -36,6 +63,9 @@ export default function BankAccountsPage() {
   const [isAdding, setIsAdding] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isResolving, setIsResolving] = useState(false)
+  const [nameError, setNameError] = useState<string | null>(null)
+  const [profileName, setProfileName] = useState('')
+  const [selectedBank, setSelectedBank] = useState<Bank | null>(null)
 
   const [formData, setFormData] = useState<FormData>({
     bank_name: '',
@@ -53,6 +83,7 @@ export default function BankAccountsPage() {
   useEffect(() => {
     fetchBanks()
     fetchBankList()
+    fetchProfileName()
   }, [])
 
   const fetchBanks = async () => {
@@ -71,6 +102,17 @@ export default function BankAccountsPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const fetchProfileName = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single()
+    if (data?.full_name) setProfileName(data.full_name)
   }
 
   const fetchBankList = async () => {
@@ -96,6 +138,7 @@ export default function BankAccountsPage() {
   const resolveAccountName = async (accountNumber: string, bankCode: string) => {
     if (accountNumber.length !== 10 || !bankCode) return
     setIsResolving(true)
+    setNameError(null)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch(
@@ -112,10 +155,21 @@ export default function BankAccountsPage() {
       )
       const data = await res.json()
       if (data?.data?.account_name) {
-        setFormData(prev => ({ ...prev, account_name: data.data.account_name }))
+        const resolvedName = data.data.account_name as string
+        setFormData(prev => ({ ...prev, account_name: resolvedName }))
+
+        // Fuzzy match against profile full_name
+        if (profileName) {
+          const score = nameMatchScore(resolvedName, profileName)
+          if (score < NAME_MATCH_THRESHOLD) {
+            setNameError(
+              `Account name "${resolvedName}" doesn't match your profile name "${profileName}". Only your own accounts are allowed.`
+            )
+          }
+        }
       } else {
         setFormData(prev => ({ ...prev, account_name: '' }))
-        alert(data.message || 'Could not verify account. Check the number and bank.')
+        setNameError(data.message || 'Could not verify account. Check the number and bank.')
       }
     } catch (err) {
       console.error(err)
@@ -125,22 +179,25 @@ export default function BankAccountsPage() {
   }
 
   const handleBankSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selected = bankList.find(b => b.code === e.target.value)
+    const selected = bankList.find(b => b.code === e.target.value) ?? null
+    setSelectedBank(selected)
+    setNameError(null)
     setFormData(prev => ({
       ...prev,
       bank_code: selected?.code ?? '',
       bank_name: selected?.name ?? '',
-      account_name: '', // clear resolved name when bank changes
+      account_name: '',
     }))
-    if (selected && formData.account_number.length === 10) {
+    if (selected && !MANUAL_NAME_TYPES.has(selected.type) && formData.account_number.length === 10) {
       resolveAccountName(formData.account_number, selected.code)
     }
   }
 
   const handleAccountNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, '').slice(0, 10)
+    setNameError(null)
     setFormData(prev => ({ ...prev, account_number: value, account_name: '' }))
-    if (value.length === 10 && formData.bank_code) {
+    if (value.length === 10 && formData.bank_code && selectedBank && !MANUAL_NAME_TYPES.has(selectedBank.type)) {
       resolveAccountName(value, formData.bank_code)
     }
   }
@@ -149,6 +206,7 @@ export default function BankAccountsPage() {
     e.preventDefault()
     if (!formData.bank_code) { alert('Please select a bank.'); return }
     if (!formData.account_name) { alert('Account name could not be resolved. Check the account number and bank.'); return }
+    if (nameError) { alert(nameError); return }
     setIsProcessing(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -270,7 +328,7 @@ export default function BankAccountsPage() {
           <div className="bg-white rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="p-8 border-b border-gray-100 flex items-center justify-between">
               <h3 className="text-2xl font-black text-gray-900">Add Account</h3>
-              <button onClick={() => setIsAdding(false)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => { setIsAdding(false); setSelectedBank(null); setNameError(null) }} className="text-gray-400 hover:text-gray-600">
                 <X size={24} />
               </button>
             </div>
@@ -309,29 +367,60 @@ export default function BankAccountsPage() {
                   />
                 </div>
 
-                {/* Auto-resolved account name */}
+                {/* Account name — auto-resolved for NUBAN banks, manual for MMOs */}
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Account Name</label>
-                  <div className="relative">
-                    <input
-                      readOnly
-                      value={formData.account_name}
-                      placeholder={isResolving ? 'Verifying…' : 'Auto-filled after verification'}
-                      className="w-full px-5 py-3.5 bg-gray-100 border border-gray-100 rounded-2xl outline-none font-bold uppercase text-gray-700 cursor-not-allowed"
-                    />
-                    {isResolving && (
-                      <Loader2 size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-brand animate-spin" />
-                    )}
-                    {!isResolving && formData.account_name && (
-                      <CheckCircle2 size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500" />
-                    )}
-                  </div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">
+                    Account Name
+                  </label>
+                  {selectedBank && MANUAL_NAME_TYPES.has(selectedBank.type) ? (
+                    <>
+                      <p className="text-[10px] text-amber-600 font-bold px-1">
+                        {selectedBank.name} accounts can't be auto-verified — enter your name exactly as registered.
+                      </p>
+                      <input
+                        required
+                        value={formData.account_name}
+                        onChange={e => {
+                          const val = e.target.value.toUpperCase()
+                          setFormData(prev => ({ ...prev, account_name: val }))
+                          if (profileName) {
+                            const score = nameMatchScore(val, profileName)
+                            setNameError(
+                              score < NAME_MATCH_THRESHOLD && val.length > 3
+                                ? `"${val}" doesn't match your profile name "${profileName}". Only your own accounts are allowed.`
+                                : null
+                            )
+                          }
+                        }}
+                        placeholder="E.g. JOHN DOE"
+                        className="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-brand outline-none transition-all font-bold uppercase"
+                      />
+                    </>
+                  ) : (
+                    <div className="relative">
+                      <input
+                        readOnly
+                        value={formData.account_name}
+                        placeholder={isResolving ? 'Verifying…' : 'Auto-filled after verification'}
+                        className="w-full px-5 py-3.5 bg-gray-100 border border-gray-100 rounded-2xl outline-none font-bold uppercase text-gray-700 cursor-not-allowed"
+                      />
+                      {isResolving && (
+                        <Loader2 size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-brand animate-spin" />
+                      )}
+                      {!isResolving && formData.account_name && !nameError && (
+                        <CheckCircle2 size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500" />
+                      )}
+                    </div>
+                  )}
+                  {nameError && (
+                    <p className="text-xs font-bold text-red-500 px-1 pt-1">{nameError}</p>
+                  )}
                 </div>
               </div>
 
               <button
                 type="submit"
-                disabled={isProcessing || isResolving || !formData.account_name}
+                disabled={isProcessing || isResolving || !formData.account_name || !!nameError}
                 className="w-full py-4 bg-brand text-white font-black rounded-2xl shadow-xl shadow-brand/20 hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {isProcessing ? <Loader2 className="animate-spin" size={24} /> : 'SECURELY SAVE ACCOUNT'}
